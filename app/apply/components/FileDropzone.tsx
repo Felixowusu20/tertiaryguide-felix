@@ -1,0 +1,149 @@
+"use client";
+
+import React, { useCallback, useRef, useState } from "react";
+import { FileUp, Loader2, X } from "lucide-react";
+
+type Props = {
+  label: string;
+  required?: boolean;
+  accept: string;
+  maxMb: number;
+  value?: string;
+  error?: string;
+  onUploaded: (url: string) => void;
+  onClear: () => void;
+};
+
+export function FileDropzone({
+  label,
+  required,
+  accept,
+  maxMb,
+  value,
+  error,
+  onUploaded,
+  onClear,
+}: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const upload = useCallback(
+    async (file: File) => {
+      setLocalError(null);
+      const allowed = accept.split(",").map((s) => s.trim().toLowerCase());
+      const ext = `.${file.name.split(".").pop()?.toLowerCase() || ""}`;
+      const typeOk =
+        allowed.some((a) => a === file.type || a === ext) ||
+        allowed.some((a) => a.endsWith("/*") && file.type.startsWith(a.replace("/*", "/")));
+
+      if (!typeOk) {
+        setLocalError(`Invalid file type. Allowed: ${accept}`);
+        return;
+      }
+      if (file.size > maxMb * 1024 * 1024) {
+        setLocalError(`File must be ${maxMb}MB or smaller`);
+        return;
+      }
+
+      setBusy(true);
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/apply/upload", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.url) {
+          throw new Error(data.error || "Upload failed");
+        }
+        onUploaded(data.url);
+      } catch (e) {
+        setLocalError(e instanceof Error ? e.message : "Upload failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [accept, maxMb, onUploaded],
+  );
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm font-medium text-[#334155]">
+        {label}
+        {required ? <span className="text-red-500"> *</span> : null}
+      </p>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) void upload(file);
+        }}
+        className={`rounded-2xl border-2 border-dashed px-4 py-6 text-center transition ${
+          dragging
+            ? "border-[var(--school-brand,#007AFF)] bg-[var(--school-brand-soft,#EFF6FF)]"
+            : error || localError
+              ? "border-red-300 bg-red-50/40"
+              : "border-[#CBD5E1] bg-[#F8FAFC]"
+        }`}
+      >
+        {value ? (
+          <div className="flex items-center justify-between gap-3 text-left">
+            <a
+              href={value}
+              target="_blank"
+              rel="noreferrer"
+              className="truncate text-sm text-[var(--school-brand,#007AFF)] underline"
+            >
+              Uploaded file ✓
+            </a>
+            <button
+              type="button"
+              onClick={onClear}
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-[#64748B]"
+            >
+              <X className="h-3 w-3" /> Remove
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => inputRef.current?.click()}
+            className="inline-flex flex-col items-center gap-2 text-sm text-[#64748B]"
+          >
+            {busy ? (
+              <Loader2 className="h-6 w-6 animate-spin text-[var(--school-brand,#007AFF)]" />
+            ) : (
+              <FileUp className="h-6 w-6 text-[var(--school-brand,#007AFF)]" />
+            )}
+            <span>
+              {busy ? "Uploading…" : "Drag & drop or click to upload"}
+            </span>
+            <span className="text-xs text-[#94A3B8]">
+              Max {maxMb}MB · {accept}
+            </span>
+          </button>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept={accept}
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void upload(file);
+          }}
+        />
+      </div>
+      {(localError || error) && (
+        <p className="text-xs text-red-600">{localError || error}</p>
+      )}
+    </div>
+  );
+}

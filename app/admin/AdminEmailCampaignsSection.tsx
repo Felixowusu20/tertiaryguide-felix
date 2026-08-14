@@ -1,0 +1,433 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { Mail, History, Send, CheckCircle2, AlertCircle, Eye } from "lucide-react";
+
+import { BlogEditor } from "@/components/tiptap-templates/blog-editor";
+
+interface CampaignHistoryItem {
+  id: string;
+  subject: string;
+  contentHtml: string;
+  target: string;
+  singleEmail: string | null;
+  totalEmails: number;
+  successCount: number;
+  failureCount: number;
+  sentAt: string;
+  status: string;
+}
+
+export function AdminEmailCampaignsSection() {
+  const [activeTab, setActiveTab] = useState<"new" | "history">("new");
+  const [editorMode, setEditorMode] = useState<"visual" | "html">("visual");
+  
+  // New campaign state
+  const [subject, setSubject] = useState("");
+  const [target, setTarget] = useState<"all" | "form-buyers" | "single">("single");
+  const [singleEmail, setSingleEmail] = useState("");
+  const [htmlContent, setHtmlContent] = useState(`<h2>Hello from TertiaryGuide!</h2>
+<p>We are excited to share some updates with you.</p>
+<p>Best regards,<br/>The TertiaryGuide Team</p>`);
+  
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{
+    success: boolean;
+    message: string;
+    stats?: { total: number; successCount: number; failureCount: number };
+  } | null>(null);
+
+  // History state
+  const [campaigns, setCampaigns] = useState<CampaignHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const loadHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      setHistoryError(null);
+      const res = await fetch("/api/admin/email-campaigns");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load campaign history");
+      }
+      setCampaigns(data.campaigns || []);
+    } catch (err: any) {
+      setHistoryError(err.message || "Failed to load campaign history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "history") {
+      void loadHistory();
+    }
+  }, [activeTab]);
+
+  const handleSendCampaign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subject.trim()) {
+      alert("Please enter a subject line.");
+      return;
+    }
+    if (!htmlContent.trim()) {
+      alert("Please enter HTML content for the email body.");
+      return;
+    }
+    if (target === "single" && !singleEmail.trim()) {
+      alert("Please specify the recipient email address.");
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to send this campaign to ${target === "single" ? singleEmail : target}?`)) {
+      return;
+    }
+
+    try {
+      setSending(true);
+      setSendResult(null);
+
+      const res = await fetch("/api/admin/email-campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject,
+          htmlContent,
+          target,
+          singleEmail: target === "single" ? singleEmail : undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to dispatch campaign");
+      }
+
+      setSendResult({
+        success: true,
+        message: data.message || "Campaign sent successfully",
+        stats: data.stats,
+      });
+
+      // Reset form if successful
+      if (target === "single") {
+        // Keep subject and html content for testing convenience
+      } else {
+        setSubject("");
+        setHtmlContent("<h2>Hello!</h2>");
+      }
+    } catch (err: any) {
+      setSendResult({
+        success: false,
+        message: err.message || "Failed to send email campaign",
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const getTargetBadgeLabel = (t: string, singleEmail?: string | null) => {
+    if (t === "all") return "All Users";
+    if (t === "form-buyers") return "Form Buyers";
+    if (t === "single") return singleEmail ? `Single (${singleEmail})` : "Single Recipient";
+    return t;
+  };
+
+  return (
+    <div className="space-y-6">
+      <section className="space-y-1">
+        <p className="text-xs font-medium text-[#9CA3AF]">
+          Dashboard / <span className="text-[#111827]">Email Campaigns</span>
+        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-[#111827] md:text-3xl">
+          Email Campaigns
+        </h1>
+        <p className="text-xs text-[#6B7280]">
+          Create, preview, and dispatch email campaigns to users or check history of sent campaigns.
+        </p>
+      </section>
+
+      {/* Campaign Tabs */}
+      <div className="flex border-b border-[#E5E7EB] text-sm">
+        <button
+          type="button"
+          onClick={() => setActiveTab("new")}
+          className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium transition-all ${
+            activeTab === "new"
+              ? "border-[#2563EB] text-[#2563EB]"
+              : "border-transparent text-[#6B7280] hover:text-[#111827]"
+          }`}
+        >
+          <Mail className="h-4 w-4" />
+          New Campaign
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("history")}
+          className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium transition-all ${
+            activeTab === "history"
+              ? "border-[#2563EB] text-[#2563EB]"
+              : "border-transparent text-[#6B7280] hover:text-[#111827]"
+          }`}
+        >
+          <History className="h-4 w-4" />
+          Campaign History
+        </button>
+      </div>
+
+      {activeTab === "new" ? (
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+          {/* Creator Form */}
+          <form onSubmit={handleSendCampaign} className="space-y-5 rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-[#111827]">Design Campaign</h2>
+
+            {sendResult && (
+              <div
+                className={`flex gap-3 rounded-xl p-4 text-xs ${
+                  sendResult.success
+                    ? "bg-[#DCFCE7] text-[#14532D]"
+                    : "bg-[#FEE2E2] text-[#7F1D1D]"
+                }`}
+              >
+                {sendResult.success ? (
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[#16A34A]" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 shrink-0 text-[#DC2626]" />
+                )}
+                <div>
+                  <p className="font-semibold">{sendResult.message}</p>
+                  {sendResult.stats && (
+                    <p className="mt-1 opacity-90">
+                      Total: {sendResult.stats.total} | Success: {sendResult.stats.successCount} | Failed: {sendResult.stats.failureCount}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label htmlFor="campaign-subject" className="text-xs font-semibold text-[#374151]">
+                Subject Line
+              </label>
+              <input
+                id="campaign-subject"
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="e.g. Early Bird Discounts for University Vouchers!"
+                className="w-full rounded-xl border border-[#D1D5DB] px-3.5 py-2 text-sm text-[#111827] placeholder-gray-400 focus:border-[#2563EB] focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="campaign-target" className="text-xs font-semibold text-[#374151]">
+                Target Audience
+              </label>
+              <select
+                id="campaign-target"
+                value={target}
+                onChange={(e) => setTarget(e.target.value as any)}
+                className="w-full rounded-xl border border-[#D1D5DB] px-3 py-2 text-sm text-[#111827] focus:border-[#2563EB] focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+              >
+                <option value="single">Single Test Email Recipient</option>
+                <option value="all">All Registered Users</option>
+                <option value="form-buyers">Form Voucher Buyers</option>
+              </select>
+            </div>
+
+            {target === "single" && (
+              <div className="space-y-1.5">
+                <label htmlFor="campaign-single-email" className="text-xs font-semibold text-[#374151]">
+                  Recipient Email
+                </label>
+                <input
+                  id="campaign-single-email"
+                  type="email"
+                  value={singleEmail}
+                  onChange={(e) => setSingleEmail(e.target.value)}
+                  placeholder="e.g. test@example.com"
+                  className="w-full rounded-xl border border-[#D1D5DB] px-3.5 py-2 text-sm text-[#111827] placeholder-gray-400 focus:border-[#2563EB] focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+                  required={target === "single"}
+                />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center pb-1">
+                <span className="text-xs font-semibold text-[#374151]">Email Body Content</span>
+                <div className="flex bg-[#F3F4F6] p-0.5 rounded-lg text-[10px] font-medium border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setEditorMode("visual")}
+                    className={`px-2.5 py-1 rounded-md transition-all ${
+                      editorMode === "visual"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    ✏️ Visual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditorMode("html")}
+                    className={`px-2.5 py-1 rounded-md transition-all ${
+                      editorMode === "html"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    💻 HTML Source
+                  </button>
+                </div>
+              </div>
+
+              {editorMode === "visual" ? (
+                <div className="min-h-[250px] border border-gray-200 rounded-xl overflow-hidden bg-white">
+                  <BlogEditor value={htmlContent} onChange={setHtmlContent} />
+                </div>
+              ) : (
+                <textarea
+                  id="campaign-html"
+                  rows={14}
+                  value={htmlContent}
+                  onChange={(e) => setHtmlContent(e.target.value)}
+                  placeholder="Write HTML formatted content..."
+                  className="w-full font-mono rounded-xl border border-[#D1D5DB] p-3.5 text-xs text-[#111827] placeholder-gray-400 focus:border-[#2563EB] focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+                  required
+                />
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={sending}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563EB] py-2.5 text-sm font-semibold text-white transition hover:bg-[#1D4ED8] disabled:opacity-50"
+            >
+              {sending ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Sending Campaign...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Send Campaign
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Live Preview Panel */}
+          <div className="flex flex-col rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-5">
+            <div className="flex items-center gap-2 pb-3 border-b border-[#E5E7EB] text-[#374151]">
+              <Eye className="h-4 w-4 text-[#2563EB]" />
+              <h2 className="text-sm font-semibold">Live Email Preview</h2>
+            </div>
+            
+            <div className="mt-4 flex-1 rounded-xl border border-[#E5E7EB] bg-white overflow-hidden flex flex-col min-h-[350px]">
+              <div className="bg-[#F3F4F6] border-b border-[#E5E7EB] px-4 py-2 text-[11px] text-[#6B7280]">
+                <p><strong>From:</strong> TertiaryGuide &lt;no-reply@ventrapos.com&gt;</p>
+                <p className="truncate"><strong>Subject:</strong> {subject || "(No Subject Specified)"}</p>
+              </div>
+              
+              <iframe
+                title="Email Preview"
+                srcDoc={`<!DOCTYPE html><html><head><style>body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; margin: 0; color: #111827; line-height: 1.5; }</style></head><body>${htmlContent}</body></html>`}
+                className="w-full flex-1 border-0 bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* History View */
+        <div className="rounded-2xl border border-[#E5E7EB] bg-white overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#F9FAFB] border-b border-[#E5E7EB] text-xs font-semibold text-[#4B5563]">
+                  <th className="px-5 py-3.5">Subject</th>
+                  <th className="px-5 py-3.5">Target</th>
+                  <th className="px-5 py-3.5">Sent Date</th>
+                  <th className="px-5 py-3.5">Delivered / Failed</th>
+                  <th className="px-5 py-3.5 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E5E7EB] text-xs text-[#111827]">
+                {historyLoading ? (
+                  Array.from({ length: 4 }).map((_, idx) => (
+                    <tr key={idx} className="animate-pulse">
+                      <td className="px-5 py-4"><div className="h-3 w-48 rounded bg-[#E5E7EB]" /></td>
+                      <td className="px-5 py-4"><div className="h-3 w-20 rounded bg-[#E5E7EB]" /></td>
+                      <td className="px-5 py-4"><div className="h-3 w-24 rounded bg-[#E5E7EB]" /></td>
+                      <td className="px-5 py-4"><div className="h-3 w-16 rounded bg-[#E5E7EB]" /></td>
+                      <td className="px-5 py-4 text-right"><div className="ml-auto h-3 w-14 rounded bg-[#E5E7EB]" /></td>
+                    </tr>
+                  ))
+                ) : historyError ? (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-6 text-center text-[#DC2626] font-medium">
+                      {historyError}
+                    </td>
+                  </tr>
+                ) : campaigns.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-8 text-center text-[#6B7280]">
+                      No email campaigns have been sent yet. Click &quot;New Campaign&quot; above to get started.
+                    </td>
+                  </tr>
+                ) : (
+                  campaigns.map((c) => (
+                    <tr key={c.id} className="hover:bg-[#F9FAFB] transition-colors">
+                      <td className="px-5 py-4 font-medium text-[#111827] max-w-xs truncate" title={c.subject}>
+                        {c.subject}
+                      </td>
+                      <td className="px-5 py-4 text-[#4B5563]">
+                        <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-700">
+                          {getTargetBadgeLabel(c.target, c.singleEmail)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-[#6B7280]">
+                        {c.sentAt ? new Date(c.sentAt).toLocaleString("en-US", {
+                          month: "short",
+                          day: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }) : "—"}
+                      </td>
+                      <td className="px-5 py-4 font-semibold">
+                        <span className="text-[#16A34A]">{c.successCount}</span>
+                        <span className="text-gray-400 mx-1">/</span>
+                        <span className={c.failureCount > 0 ? "text-[#DC2626]" : "text-gray-400"}>
+                          {c.failureCount}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            c.status === "Success"
+                              ? "bg-[#DCFCE7] text-[#14532D]"
+                              : c.status === "Partial Success"
+                              ? "bg-[#FEF3C7] text-[#78350F]"
+                              : "bg-[#FEE2E2] text-[#7F1D1D]"
+                          }`}
+                        >
+                          {c.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
