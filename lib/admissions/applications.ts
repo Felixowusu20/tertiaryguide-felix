@@ -11,6 +11,10 @@ import type {
   UploadedDocuments,
 } from "./types";
 import { APPLICATION_STATUSES } from "./types";
+import {
+  legacyProgrammeFallback,
+  listProgrammeChoices,
+} from "./programme-choices";
 
 export function applicationsCollection(db: Db) {
   return db.collection<ApplicationDoc>("applications");
@@ -18,10 +22,38 @@ export function applicationsCollection(db: Db) {
 
 export async function ensureApplicationIndexes(db: Db): Promise<void> {
   const apps = applicationsCollection(db);
-  await apps.createIndex({ applicationNumber: 1 }, { unique: true });
-  await apps.createIndex({ schoolId: 1, submittedAt: -1 });
-  await apps.createIndex({ schoolId: 1, status: 1 });
-  await apps.createIndex({ applicantEmail: 1, schoolId: 1 });
+
+  // Legacy applications stored `reference` instead of `applicationNumber`.
+  // A unique index on applicationNumber cannot be built while several docs
+  // share a missing/null value, which previously 500'd every submit.
+  try {
+    await apps.updateMany(
+      {
+        $or: [
+          { applicationNumber: { $exists: false } },
+          { applicationNumber: { $type: "null" } },
+        ],
+        reference: { $type: "string" },
+      },
+      [{ $set: { applicationNumber: "$reference" } }],
+    );
+  } catch (error) {
+    console.error("[applications] backfill applicationNumber", error);
+  }
+
+  const specs: Array<[Record<string, 1 | -1>, Record<string, unknown>?]> = [
+    [{ applicationNumber: 1 }, { unique: true, sparse: true }],
+    [{ schoolId: 1, submittedAt: -1 }],
+    [{ schoolId: 1, status: 1 }],
+    [{ applicantEmail: 1, schoolId: 1 }],
+  ];
+  for (const [keys, options] of specs) {
+    try {
+      await apps.createIndex(keys, options as { unique?: boolean; sparse?: boolean });
+    } catch (error) {
+      console.error("[applications] createIndex", keys, error);
+    }
+  }
 }
 
 async function nextApplicationSequence(db: Db, schoolSlug: string): Promise<number> {
@@ -33,9 +65,12 @@ async function nextApplicationSequence(db: Db, schoolSlug: string): Promise<numb
     { $inc: { seq: 1 } },
     { upsert: true, returnDocument: "after" },
   );
-  const doc = (result as { value?: { seq: number } } | null)?.value
-    ?? (result as { seq?: number } | null);
-  return doc?.seq ?? 1;
+  const doc =
+    result && typeof result === "object" && "seq" in result
+      ? result
+      : (result as { value?: { seq: number } } | null)?.value;
+  const seq = doc?.seq;
+  return typeof seq === "number" && Number.isFinite(seq) ? seq : 1;
 }
 
 export async function generateApplicationNumber(
@@ -59,6 +94,10 @@ export function serializeApplication(doc: ApplicationDoc) {
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
+  const programmes = listProgrammeChoices(
+    doc.programmeChoices,
+    legacyProgrammeFallback(doc as ApplicationDoc & { programmeChoice?: unknown }),
+  );
 
   return {
     id: String(doc._id),
@@ -69,7 +108,8 @@ export function serializeApplication(doc: ApplicationDoc) {
     fullName: fullName || personal?.surname || "Applicant",
     phone: personal?.phoneNumber ?? null,
     email: personal?.email ?? doc.applicantEmail,
-    programme: doc.programmeChoices?.firstChoice ?? null,
+    programme: programmes[0]?.display ?? doc.programmeChoices?.firstChoice ?? null,
+    programmes,
     personalInfo: doc.personalInfo,
     guardianInfo: doc.guardianInfo ?? null,
     programmeChoices: doc.programmeChoices ?? null,
@@ -77,8 +117,16 @@ export function serializeApplication(doc: ApplicationDoc) {
     examinationInfo: doc.examinationInfo ?? null,
     results: doc.results ?? [],
     documents: doc.documents ?? null,
-    submittedAt: doc.submittedAt.toISOString(),
-    updatedAt: doc.updatedAt.toISOString(),
+    submittedAt:
+      doc.submittedAt instanceof Date
+        ? doc.submittedAt.toISOString()
+        : new Date().toISOString(),
+    updatedAt:
+      doc.updatedAt instanceof Date
+        ? doc.updatedAt.toISOString()
+        : doc.submittedAt instanceof Date
+          ? doc.submittedAt.toISOString()
+          : new Date().toISOString(),
     reviewedAt: doc.reviewedAt ? doc.reviewedAt.toISOString() : null,
     reviewedBy: doc.reviewedBy ?? null,
     reviewNotes: doc.reviewNotes ?? null,

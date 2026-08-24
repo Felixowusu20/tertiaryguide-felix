@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  BadgeCheck,
   Compass,
   Eye,
   Heart,
@@ -69,6 +70,86 @@ function timeAgo(iso: string) {
   });
 }
 
+type MediaShape = "portrait" | "landscape" | "square";
+
+function mediaShapeFromRatio(width: number, height: number): MediaShape {
+  if (!width || !height) return "portrait";
+  const ratio = width / height;
+  if (ratio < 0.86) return "portrait";
+  if (ratio > 1.2) return "landscape";
+  return "square";
+}
+
+function mediaFrameClass(compact: boolean, shape: MediaShape) {
+  if (compact) return "aspect-square";
+  if (shape === "landscape") return "aspect-video";
+  return "h-[min(52dvh,460px)]";
+}
+
+function ExploreVideo({
+  src,
+  compact = false,
+}: {
+  src: string;
+  compact?: boolean;
+}) {
+  const [shape, setShape] = useState<MediaShape>("portrait");
+
+  return (
+    <div
+      className={`relative w-full overflow-hidden bg-black ${mediaFrameClass(compact, shape)}`}
+    >
+      <video
+        src={src}
+        controls
+        playsInline
+        preload="metadata"
+        onLoadedMetadata={(e) => {
+          const video = e.currentTarget;
+          setShape(mediaShapeFromRatio(video.videoWidth, video.videoHeight));
+        }}
+        className="absolute inset-0 h-full w-full object-cover object-center"
+      />
+    </div>
+  );
+}
+
+function ExploreImage({
+  src,
+  compact = false,
+  onOpen,
+}: {
+  src: string;
+  compact?: boolean;
+  onOpen: () => void;
+}) {
+  const [shape, setShape] = useState<MediaShape>("portrait");
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`relative w-full overflow-hidden bg-black ${mediaFrameClass(compact, shape)}`}
+    >
+      <Image
+        src={src}
+        alt="Explore flyer"
+        fill
+        onLoad={(e) => {
+          const img = e.currentTarget;
+          setShape(mediaShapeFromRatio(img.naturalWidth, img.naturalHeight));
+        }}
+        className="object-cover object-center"
+        sizes={
+          compact
+            ? "(max-width: 640px) 50vw, 280px"
+            : "(max-width: 640px) 100vw, 560px"
+        }
+      />
+    </button>
+  );
+}
+
 export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
   const [posts, setPosts] = useState<ExplorePost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +161,7 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [commentBusy, setCommentBusy] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const viewedIds = useRef<Set<string>>(new Set());
   const observerRef = useRef<IntersectionObserver | null>(null);
 
@@ -286,7 +368,7 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
         id="explore"
         className={
           embedded
-            ? "relative scroll-mt-24"
+            ? "relative scroll-mt-24 bg-[#F7F9FC] pb-2"
             : "relative mt-10 scroll-mt-24 overflow-hidden sm:mt-14 md:mt-16"
         }
       >
@@ -300,7 +382,7 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
         <div
           className={
             embedded
-              ? "relative mx-auto max-w-xl px-4 sm:px-6"
+              ? "relative mx-auto max-w-xl px-3 pb-10 pt-4 sm:px-4 sm:pt-6"
               : "relative mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12 md:px-10 md:py-14"
           }
         >
@@ -321,13 +403,18 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
           )}
 
           {embedded && (
-            <div className="mb-5 px-1 sm:mb-6">
-              <h2 className="text-xl font-semibold tracking-tight text-[#252525] sm:text-2xl">
-                Opportunities & resources
-              </h2>
-              <p className="mt-1 text-sm text-[#6B7280]">
-                Updates from schools, flyers, deadlines, and partner tips
-              </p>
+            <div className="mb-4 flex items-center gap-2.5 px-1">
+              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#007AFF] text-white">
+                <Compass className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight text-[#0F172A]">
+                  Latest updates
+                </h2>
+                <p className="text-xs text-[#64748B]">
+                  Flyers, deadlines, and school news
+                </p>
+              </div>
             </div>
           )}
 
@@ -353,113 +440,91 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {posts.map((post) => (
                   <article
                     key={post.id}
                     ref={(node) => postNodeRef(node, post.id)}
-                    className="overflow-hidden rounded-3xl border border-[#E8EEF5] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]"
+                    className="overflow-hidden rounded-[28px] border border-[#E8EEF5] bg-white shadow-[0_10px_32px_rgba(15,23,42,0.05)]"
                   >
-                    <div className="p-4 sm:p-5">
-                      <header className="flex items-start gap-3">
-                        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#EFF6FF] ring-2 ring-white shadow-sm">
-                          {post.authorAvatar ? (
-                            <Image
-                              src={post.authorAvatar}
-                              alt=""
-                              fill
-                              className="object-cover"
+                    <header className="flex items-start gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
+                      <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#EFF6FF] ring-2 ring-white shadow-sm">
+                        {post.authorAvatar ? (
+                          <Image
+                            src={post.authorAvatar}
+                            alt=""
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-sm font-bold text-[#007AFF]">
+                            {post.authorName.slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <p className="truncate text-[15px] font-semibold text-[#0F1419]">
+                            {post.authorName}
+                          </p>
+                          {post.isSponsored && (
+                            <span className="rounded-md bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                              Sponsored
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-[12px] text-[#6B7280]">
+                          <span className="font-medium text-[#007AFF]">
+                            {postTypeLabel(post.postType)}
+                          </span>
+                          <span className="mx-1.5 text-[#D1D5DB]">·</span>
+                          {timeAgo(post.publishedAt || post.createdAt)}
+                        </p>
+                      </div>
+                    </header>
+
+                    {post.body && (
+                      <p className="mt-3 whitespace-pre-wrap px-4 text-[15px] leading-relaxed text-[#1E1E1E] sm:px-5">
+                        {post.body}
+                      </p>
+                    )}
+
+                    {post.media.length > 0 && (
+                      <div
+                        className={`mt-3 overflow-hidden bg-[#0B1220] ${
+                          post.media.length === 1 ? "" : "grid grid-cols-2 gap-px"
+                        }`}
+                      >
+                        {post.media.slice(0, 4).map((m, i) =>
+                          m.type === "video" ? (
+                            <ExploreVideo
+                              key={`${post.id}-media-${i}`}
+                              src={m.url}
+                              compact={post.media.length > 1}
                             />
                           ) : (
-                            <span className="flex h-full w-full items-center justify-center text-sm font-bold text-[#007AFF]">
-                              {post.authorName.slice(0, 1).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1 pt-0.5">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <p className="truncate text-[15px] font-semibold text-[#0F1419]">
-                              {post.authorName}
-                            </p>
-                            {post.isSponsored && (
-                              <span className="rounded-md bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#6B7280]">
-                                Sponsored
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-0.5 text-[12px] text-[#6B7280]">
-                            <span className="font-medium text-[#007AFF]">
-                              {postTypeLabel(post.postType)}
-                            </span>
-                            <span className="mx-1.5 text-[#D1D5DB]">·</span>
-                            {timeAgo(post.publishedAt || post.createdAt)}
-                          </p>
-                        </div>
-                      </header>
+                            <ExploreImage
+                              key={`${post.id}-media-${i}`}
+                              src={m.url}
+                              compact={post.media.length > 1}
+                              onOpen={() => setLightboxUrl(m.url)}
+                            />
+                          ),
+                        )}
+                      </div>
+                    )}
 
-                      {post.body && (
-                        <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-[#1E1E1E]">
-                          {post.body}
-                        </p>
-                      )}
-
-                      {post.media.length > 0 && (
-                        <div
-                          className={`mt-3 overflow-hidden rounded-2xl bg-[#F3F4F6] ${
-                            post.media.length === 1
-                              ? "ring-1 ring-[#EEF2F7]"
-                              : "grid grid-cols-2 gap-0.5"
-                          }`}
-                        >
-                          {post.media.slice(0, 4).map((m, i) =>
-                            m.type === "video" ? (
-                              <video
-                                key={`${post.id}-media-${i}`}
-                                src={m.url}
-                                controls
-                                playsInline
-                                className={`w-full bg-black object-contain ${
-                                  post.media.length === 1
-                                    ? "max-h-[420px]"
-                                    : "aspect-square object-cover"
-                                }`}
-                              />
-                            ) : (
-                              <div
-                                key={`${post.id}-media-${i}`}
-                                className={`relative w-full bg-[#F3F4F6] ${
-                                  post.media.length === 1
-                                    ? "min-h-[200px]"
-                                    : "aspect-square"
-                                }`}
-                              >
-                                <Image
-                                  src={m.url}
-                                  alt=""
-                                  fill
-                                  className={
-                                    post.media.length === 1
-                                      ? "object-contain"
-                                      : "object-cover"
-                                  }
-                                  sizes="(max-width: 640px) 100vw, 560px"
-                                />
-                              </div>
-                            ),
-                          )}
-                        </div>
-                      )}
-
-                      {post.featuredSchool && (
+                    {post.featuredSchool && (
+                      <div className="px-4 pt-3 sm:px-5">
                         <Link
                           href={
                             post.featuredSchool.slug
                               ? `/apply/school/${encodeURIComponent(post.featuredSchool.slug)}`
                               : `/university-forms/${post.featuredSchool.id}`
                           }
-                          className="mt-3 flex items-center gap-3 rounded-2xl border border-[#E8EEF5] bg-[#F8FBFF] p-3 transition hover:border-[#BFDBFE] hover:bg-[#EFF6FF]"
+                          className="flex items-center gap-3 rounded-2xl border border-[#E8EEF5] bg-[#F8FBFF] px-3 py-2.5 transition hover:border-[#BFDBFE]"
                         >
-                          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-[#E5E7EB]">
+                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-[#E5E7EB]">
                             {post.featuredSchool.logoSrc ? (
                               <Image
                                 src={post.featuredSchool.logoSrc}
@@ -470,8 +535,13 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                             ) : null}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-[#111827]">
-                              {post.featuredSchool.name}
+                            <p className="flex items-center gap-1 truncate text-sm font-semibold text-[#111827]">
+                              <span className="truncate">{post.featuredSchool.name}</span>
+                              <BadgeCheck
+                                className="h-3.5 w-3.5 shrink-0 text-[#007AFF]"
+                                fill="currentColor"
+                                stroke="white"
+                              />
                             </p>
                             {post.featuredSchool.deadline && (
                               <p className="text-xs text-[#DC2626]">
@@ -487,10 +557,10 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                             )}
                           </div>
                         </Link>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
-                    <div className="flex items-center justify-between gap-1 border-t border-[#F1F5F9] px-2 py-1.5 sm:px-3">
+                    <div className="mt-1 flex items-center justify-between gap-1 px-2 py-1.5 sm:px-3">
                       <button
                         type="button"
                         onClick={() => void toggleLike(post)}
@@ -623,6 +693,31 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {lightboxUrl && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-zoom-out"
+            aria-label="Close image"
+            onClick={() => setLightboxUrl(null)}
+          />
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(null)}
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-[#111827]"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt="Explore flyer"
+            className="relative z-10 max-h-[90vh] max-w-full object-contain"
+          />
         </div>
       )}
     </>

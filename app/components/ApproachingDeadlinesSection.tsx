@@ -3,18 +3,26 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { isInApproachingWindow } from "@/lib/deadlines";
+import { ArrowRight, BadgeCheck } from "lucide-react";
+import {
+  compareDeadlineForListing,
+  isDeadlineCalendarExpired,
+  isInApproachingWindow,
+} from "@/lib/deadlines";
 import { SchoolListLabel } from "@/app/components/SchoolListLabel";
+import { catalogSchoolHref } from "@/lib/school-links";
 
 type HomeDeadlineSchool = {
   id: string;
   name: string;
   alias: string | null;
+  slug?: string | null;
   logoSrc: string | null;
   logoAlt: string | null;
   priceGhs: number | null;
   deadline: string | null;
+  isPartner?: boolean;
+  isVerified?: boolean;
 };
 
 function formatDeadline(deadline: string | null): string {
@@ -57,12 +65,41 @@ export function ApproachingDeadlinesSection() {
 
   const APPROACHING_DAYS = 30;
 
-  const approaching = schools
-    .filter((school) => isInApproachingWindow(school.deadline, APPROACHING_DAYS))
-    .sort(
-      (a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime(),
+  const byDeadlineThenName = (a: HomeDeadlineSchool, b: HomeDeadlineSchool) => {
+    const byDeadline = compareDeadlineForListing(a.deadline, b.deadline);
+    if (byDeadline !== 0) return byDeadline;
+    return a.name.localeCompare(b.name);
+  };
+
+  const partnerSchools = schools
+    .filter((school) => school.isPartner || school.isVerified)
+    .sort(byDeadlineThenName);
+
+  const approachingCatalog = schools
+    .filter(
+      (school) =>
+        !school.isPartner &&
+        !school.isVerified &&
+        isInApproachingWindow(school.deadline, APPROACHING_DAYS),
     )
+    .sort(byDeadlineThenName)
     .slice(0, 20);
+
+  const seen = new Set<string>();
+  const approaching = [...partnerSchools, ...approachingCatalog]
+    .filter((school) => {
+      if (seen.has(school.id)) return false;
+      seen.add(school.id);
+      return true;
+    })
+    .sort((a, b) => {
+      const byDeadline = compareDeadlineForListing(a.deadline, b.deadline);
+      if (byDeadline !== 0) return byDeadline;
+      if (Boolean(a.isPartner || a.isVerified) !== Boolean(b.isPartner || b.isVerified)) {
+        return a.isPartner || a.isVerified ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
 
   const gridCols =
     "grid-cols-[minmax(0,1.4fr)_minmax(4.5rem,0.7fr)_minmax(5rem,0.8fr)] sm:grid-cols-[minmax(0,1.6fr)_minmax(6.5rem,0.7fr)_minmax(7rem,0.8fr)] md:grid-cols-[minmax(0,1.8fr)_minmax(7.5rem,0.65fr)_minmax(8rem,0.75fr)]";
@@ -92,10 +129,12 @@ export function ApproachingDeadlinesSection() {
             No application deadlines in the next {APPROACHING_DAYS} days.
           </div>
         ) : (
-          approaching.map((school) => (
+          approaching.map((school) => {
+            const expired = isDeadlineCalendarExpired(school.deadline);
+            return (
             <Link
               key={school.id}
-              href={`/university-forms/${school.id}`}
+              href={catalogSchoolHref(school)}
               aria-label={`${school.alias?.trim() || school.name} — ${formatPrice(school.priceGhs)} — deadline ${formatDeadline(school.deadline)}`}
               className={`group grid min-h-0 min-w-0 ${gridCols} items-center gap-x-2 border-b border-[#E5E7EB] bg-white px-0 py-3 text-inherit no-underline transition-all duration-150 [touch-action:manipulation] hover:rounded-2xl hover:bg-[#007AFF] hover:px-2.5 hover:text-white active:rounded-2xl active:bg-[#007AFF] active:px-2.5 active:text-white sm:gap-x-4 sm:py-3.5 sm:hover:px-3.5 sm:active:px-3.5`}
             >
@@ -111,12 +150,19 @@ export function ApproachingDeadlinesSection() {
                     />
                   </div>
                 )}
-                <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden sm:gap-1.5">
                   <SchoolListLabel
                     name={school.name}
                     alias={school.alias}
                     className="min-w-0 text-left text-[13px] font-medium leading-snug text-[#252525] group-hover:text-white sm:text-sm sm:break-words sm:[overflow-wrap:anywhere]"
                   />
+                  {(school.isVerified || school.isPartner) && (
+                    <BadgeCheck
+                      className="h-3.5 w-3.5 shrink-0 text-[#007AFF] group-hover:text-white sm:h-4 sm:w-4"
+                      fill="currentColor"
+                      stroke="white"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -124,11 +170,18 @@ export function ApproachingDeadlinesSection() {
                 {formatPrice(school.priceGhs)}
               </span>
 
-              <span className="w-full text-right text-[11px] font-medium tabular-nums leading-none text-[#252525] group-hover:text-white sm:text-sm">
+              <span
+                className={`w-full text-right text-[11px] font-medium tabular-nums leading-none sm:text-sm ${
+                  expired
+                    ? "text-red-600 group-hover:text-white"
+                    : "text-[#252525] group-hover:text-white"
+                }`}
+              >
                 {formatDeadline(school.deadline)}
               </span>
             </Link>
-          ))
+            );
+          })
         )}
       </div>
 

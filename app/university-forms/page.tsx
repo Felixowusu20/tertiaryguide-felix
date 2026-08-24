@@ -7,19 +7,24 @@ import { Search, BadgeCheck, Loader2, Building2 } from "lucide-react";
 import { Header } from "../components/Header";
 import { FaqSection } from "../components/FaqSection";
 import { Footer } from "../components/Footer";
-import { isDeadlineCalendarExpired } from "@/lib/deadlines";
+import {
+  compareDeadlineForListing,
+  isDeadlineCalendarExpired,
+} from "@/lib/deadlines";
 import { SchoolListLabel } from "@/app/components/SchoolListLabel";
-import { PartnerSchoolsSection } from "@/app/components/PartnerSchoolsSection";
+import { catalogSchoolHref } from "@/lib/school-links";
 
 type UniversityFormSchool = {
   id: string;
   name: string;
   alias: string | null;
+  slug?: string | null;
   logoSrc: string | null;
   logoAlt: string | null;
   priceGhs: number | null;
   deadline: string | null;
   isVerified?: boolean;
+  isPartner?: boolean;
   /** @deprecated use categories; still set for older clients */
   category?: string;
   categories?: string[];
@@ -88,8 +93,19 @@ export default function UniversityFormsPage() {
           ? [school.category]
           : [];
     const matchesCategory =
-      activeTab === "All" || schoolCats.includes(activeTab);
+      activeTab === "All" ||
+      schoolCats.includes(activeTab) ||
+      Boolean(school.isPartner);
     return matchesSearch && matchesCategory;
+  });
+
+  const listedSchools = [...filteredSchools].sort((a, b) => {
+    const byDeadline = compareDeadlineForListing(a.deadline, b.deadline);
+    if (byDeadline !== 0) return byDeadline;
+    if (Boolean(a.isPartner) !== Boolean(b.isPartner)) {
+      return a.isPartner ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name);
   });
 
   const formsGridCols =
@@ -160,7 +176,7 @@ export default function UniversityFormsPage() {
 
           <section className="space-y-4 sm:space-y-6">
             <div
-              className="flex w-full snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain scroll-pb-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:gap-6 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
+              className="flex w-full gap-2 overflow-x-auto overscroll-x-contain scroll-pb-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:gap-6 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
               role="tablist"
               aria-label="Filter by category"
             >
@@ -171,7 +187,7 @@ export default function UniversityFormsPage() {
                   role="tab"
                   aria-selected={activeTab === tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`shrink-0 snap-start rounded-full px-3 py-2 text-xs font-medium transition [touch-action:manipulation] active:scale-[0.98] sm:rounded-none sm:px-0 sm:py-0 sm:pb-1 sm:text-sm ${
+                  className={`shrink-0 rounded-full px-3 py-2 text-xs font-medium transition [touch-action:manipulation] active:scale-[0.98] sm:rounded-none sm:px-0 sm:py-0 sm:pb-1 sm:text-sm ${
                     activeTab === tab
                       ? "bg-[#007AFF] text-white shadow-sm hover:bg-[#0066D6] hover:text-white sm:border-b-2 sm:border-[#007AFF] sm:bg-transparent sm:pb-1 sm:pt-0 sm:text-[#007AFF] sm:shadow-none sm:hover:bg-transparent sm:hover:text-[#007AFF]"
                       : "bg-gray-100/80 text-[#555555] hover:text-[#007AFF] sm:bg-transparent"
@@ -197,18 +213,18 @@ export default function UniversityFormsPage() {
                   <div className="border-b border-[#E5E7EB] px-0 py-10 text-center text-xs text-gray-400 sm:text-sm">
                     Loading forms...
                   </div>
-                ) : filteredSchools.length === 0 ? (
+                ) : listedSchools.length === 0 ? (
                   <div className="border-b border-[#E5E7EB] px-0 py-10 text-center text-sm text-[#374151]">
                     No forms match your search.
                   </div>
                 ) : (
-                  filteredSchools.map((form) => {
+                  listedSchools.map((form) => {
                     const expired = isDeadlineCalendarExpired(form.deadline);
 
                     return (
                       <Link
                         key={form.id}
-                        href={`/university-forms/${form.id}`}
+                        href={catalogSchoolHref(form)}
                         className={`group grid min-h-0 min-w-0 ${formsGridCols} items-center gap-x-2 border-b border-[#E5E7EB] bg-white px-0 py-3 text-inherit no-underline transition-all duration-150 [touch-action:manipulation] hover:rounded-2xl hover:bg-[#007AFF] hover:px-2.5 hover:text-white active:rounded-2xl active:bg-[#007AFF] active:px-2.5 active:text-white sm:gap-x-4 sm:py-3.5 sm:hover:px-3.5 sm:active:px-3.5`}
                       >
                         <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
@@ -229,7 +245,7 @@ export default function UniversityFormsPage() {
                               alias={form.alias}
                               className="min-w-0 text-left text-[13px] font-medium leading-snug text-[#252525] group-hover:text-white sm:text-sm sm:break-words sm:[overflow-wrap:anywhere]"
                             />
-                            {form.isVerified && (
+                            {(form.isVerified || form.isPartner) && (
                               <BadgeCheck
                                 className="h-3.5 w-3.5 shrink-0 text-[#007AFF] group-hover:text-white sm:h-4 sm:w-4"
                                 fill="currentColor"
@@ -252,16 +268,7 @@ export default function UniversityFormsPage() {
                               : "text-[#252525] group-hover:text-white"
                           }`}
                         >
-                          {expired ? (
-                            <>
-                              <span className="sm:hidden">Expired</span>
-                              <span className="hidden sm:inline">
-                                {formatDeadline(form.deadline)}
-                              </span>
-                            </>
-                          ) : (
-                            formatDeadline(form.deadline)
-                          )}
+                          {formatDeadline(form.deadline)}
                         </span>
                       </Link>
                     );
@@ -269,10 +276,6 @@ export default function UniversityFormsPage() {
                 )}
               </div>
             </div>
-          </section>
-
-          <section className="space-y-4 border-t border-gray-100 pt-8 sm:space-y-6 sm:pt-10 md:pt-12">
-            <PartnerSchoolsSection />
           </section>
 
           <section className="border-t border-gray-100 pt-8 pb-4 sm:pt-10 md:pt-12">
@@ -287,9 +290,9 @@ export default function UniversityFormsPage() {
                     Still can&apos;t find the institution you&apos;re looking for?
                   </h2>
                   <p className="mt-2 text-sm leading-relaxed text-gray-600 min-[400px]:mt-1.5">
-                    Browse the institutions accepting applications online above
-                    first. If yours is not listed, request it here and we&apos;ll
-                    review adding it when we can.
+                    Browse the schools listed above first. If yours is not
+                    listed, request it here and we&apos;ll review adding it
+                    when we can.
                   </p>
                 </div>
               </div>

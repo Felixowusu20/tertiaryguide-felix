@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { GraduationCap, Loader2 } from "lucide-react";
+import { BadgeCheck, GraduationCap, Loader2 } from "lucide-react";
 import { isDeadlineCalendarExpired } from "@/lib/deadlines";
 import { SchoolListLabel } from "@/app/components/SchoolListLabel";
 
@@ -20,6 +20,7 @@ type PartnerSchool = {
   postgraduateVoucherPrice?: number | null;
   requiresVoucher: boolean;
   deadline: string | null;
+  isVerified?: boolean;
 };
 
 function formatDeadline(deadline: string | null): string {
@@ -43,7 +44,11 @@ function schoolHref(school: PartnerSchool) {
   return `/apply?school=${encodeURIComponent(school.id)}`;
 }
 
-export function PartnerSchoolsSection() {
+export function PartnerSchoolsSection({
+  variant = "list",
+}: {
+  variant?: "list" | "cards";
+}) {
   const [schools, setSchools] = useState<PartnerSchool[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -67,6 +72,88 @@ export function PartnerSchoolsSection() {
   }, []);
 
   if (!loading && schools.length === 0) return null;
+
+  if (variant === "cards") {
+    return (
+      <section className="w-full min-w-0 space-y-4">
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#007AFF]">
+              Featured schools
+            </p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-[#252525] sm:text-xl">
+              Institutions accepting applications
+            </h2>
+          </div>
+          <Link
+            href="/apply"
+            className="shrink-0 text-sm font-semibold text-[#007AFF] hover:underline"
+          >
+            View all →
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-[#94A3B8]">
+            <Loader2 className="h-5 w-5 animate-spin text-[#007AFF]" />
+            Loading institutions…
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+            {schools.map((school) => {
+              const expired = isDeadlineCalendarExpired(school.deadline);
+              const price =
+                school.undergraduateVoucherPrice ?? school.voucherPrice ?? null;
+              return (
+                <Link
+                  key={school.id}
+                  href={schoolHref(school)}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-[#E8EEF5] bg-white p-3 shadow-sm transition hover:border-[#BFDBFE] hover:shadow-md sm:p-4"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-[#F8FAFC] ring-1 ring-[#EEF2F7] sm:h-12 sm:w-12">
+                      {school.logoSrc ? (
+                        <Image
+                          src={school.logoSrc}
+                          alt={school.logoAlt ?? school.name}
+                          fill
+                          className="object-contain p-1"
+                          sizes="48px"
+                        />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-[#007AFF]">
+                          <GraduationCap className="h-5 w-5" />
+                        </span>
+                      )}
+                    </div>
+                    <BadgeCheck
+                      className="ml-auto h-4 w-4 shrink-0 text-[#007AFF]"
+                      fill="currentColor"
+                      stroke="white"
+                      aria-label="Verified partner school"
+                    />
+                  </div>
+                  <p className="mt-3 line-clamp-2 text-sm font-semibold leading-snug text-[#1E1E1E]">
+                    {school.alias?.trim() || school.name}
+                  </p>
+                  <p
+                    className={`mt-1 text-[11px] font-medium ${
+                      expired ? "text-red-600" : "text-[#6B7280]"
+                    }`}
+                  >
+                    {expired ? "Deadline passed" : formatDeadline(school.deadline)}
+                  </p>
+                  <p className="mt-auto pt-2 text-xs font-semibold text-[#007AFF]">
+                    {formatPrice(price)}
+                  </p>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    );
+  }
 
   const gridCols =
     "grid-cols-[minmax(0,1.4fr)_minmax(4.5rem,0.7fr)_minmax(5rem,0.8fr)] sm:grid-cols-[minmax(0,1.6fr)_minmax(6.5rem,0.7fr)_minmax(7rem,0.8fr)] md:grid-cols-[minmax(0,1.8fr)_minmax(7.5rem,0.65fr)_minmax(8rem,0.75fr)]";
@@ -145,6 +232,12 @@ export function PartnerSchoolsSection() {
                       name={school.name}
                       alias={school.alias}
                       className="min-w-0 text-left text-[13px] font-medium leading-snug text-[#252525] group-hover:text-white sm:text-sm sm:break-words sm:[overflow-wrap:anywhere]"
+                    />
+                    <BadgeCheck
+                      className="h-3.5 w-3.5 shrink-0 text-[#007AFF] group-hover:text-white sm:h-4 sm:w-4"
+                      fill="currentColor"
+                      stroke="white"
+                      aria-label="Verified partner school"
                     />
                   </div>
 

@@ -1187,22 +1187,32 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
         </div>
       )}
 
-        {/* Mobile: menu only (notifications live inside the drawer) */}
+        {/* Mobile: notifications + menu */}
         <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 md:hidden">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(true)}
-            className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E0E0E0] text-[#1E1E1E] transition hover:border-[#D0D0D0] hover:bg-[#F5F5F5] active:scale-[0.95]"
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" />
-            {!hideAuth &&
-              (showUserControls || isAuthed) &&
-              notificationCount > 0 && (
+          {!hideAuth && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setNotificationsOpen(true)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E0E0E0] text-[#1E1E1E] transition hover:border-[#D0D0D0] hover:bg-[#F5F5F5] active:scale-[0.95]"
+                aria-label="Notifications"
+              >
+                <Bell className="h-5 w-5" />
+              </button>
+              {notificationCount > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#007AFF] px-0.5 text-[9px] font-semibold text-white shadow-sm">
                   {notificationCount}
                 </span>
               )}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E0E0E0] text-[#1E1E1E] transition hover:border-[#D0D0D0] hover:bg-[#F5F5F5] active:scale-[0.95]"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
           </button>
         </div>
       </div>

@@ -268,7 +268,7 @@ function ProgramCompareContent() {
 
   const colTemplate = useMemo(() => {
     const n = Math.max(visibleItems.length, 1);
-    return `minmax(7.5rem,9rem) repeat(${n}, minmax(10rem,1fr))`;
+    return `minmax(4.5rem,6.5rem) repeat(${n}, minmax(8.25rem,1fr))`;
   }, [visibleItems.length]);
 
   return (
@@ -355,77 +355,24 @@ function ProgramCompareContent() {
               </button>
             </div>
 
-            {/* Mobile cards */}
-            <div className="space-y-3 md:hidden">
-              {visibleItems.map((item) => (
-                <article
-                  key={item.key}
-                  className="overflow-hidden rounded-2xl border border-[#EFEFEF] bg-white"
-                >
-                  <div className="flex items-center justify-between gap-3 border-b border-[#F0F0F0] bg-[#FAFAFA] px-4 py-3">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      {item.school.logoSrc ? (
-                        <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-[#EEF2F7] bg-white">
-                          <Image
-                            src={item.school.logoSrc}
-                            alt=""
-                            fill
-                            className="object-contain p-1"
-                          />
-                        </span>
-                      ) : null}
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[#1E1E1E]">
-                          {schoolLabel(item.school)}
-                        </p>
-                        <p className="text-[11px] text-[#6B7280]">
-                          {item.offersProgramme
-                            ? item.school.isPartner
-                              ? "Direct application"
-                              : "University form"
-                            : "Programme not listed"}
-                        </p>
-                      </div>
-                    </div>
-                    {selectedSchoolIds.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeFromCompare(item.school.id)}
-                        className="shrink-0 rounded-full p-1.5 text-[#6B7280] hover:bg-[#E5E7EB]"
-                        aria-label={`Remove ${schoolLabel(item.school)}`}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                  <dl className="divide-y divide-[#F3F4F6] px-4">
-                    {ROWS.map((row) => (
-                      <div key={row.key} className="flex gap-4 py-3">
-                        <dt className="w-[38%] shrink-0 text-xs font-medium text-[#6B7280]">
-                          {row.label}
-                        </dt>
-                        <dd className="min-w-0 flex-1 text-sm leading-snug text-[#1E1E1E]">
-                          {row.getValue(item)}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </article>
-              ))}
-            </div>
+            {visibleItems.length >= 2 && (
+              <p className="text-xs text-[#6B7280] md:hidden">
+                Schools sit side by side — swipe sideways if needed.
+              </p>
+            )}
 
-            {/* Desktop table */}
-            <div className="hidden min-w-0 overflow-x-auto rounded-2xl border border-[#EFEFEF] md:block">
+            {/* Side-by-side comparison on all breakpoints */}
+            <div className="min-w-0 overflow-x-auto rounded-2xl border border-[#EFEFEF]">
               <div
                 style={{
-                  minWidth: `max(100%, ${144 + Math.max(visibleItems.length, 1) * 160}px)`,
+                  minWidth: `max(100%, ${72 + Math.max(visibleItems.length, 1) * 132}px)`,
                 }}
               >
                 <div
                   className="grid border-b border-[#E5E5E5] bg-[#FAFAFA]"
                   style={{ gridTemplateColumns: colTemplate }}
                 >
-                  <div className="sticky left-0 z-20 border-r border-[#E5E5E5] bg-[#FAFAFA] px-4 py-3 text-left text-sm font-medium text-[#6B7280]">
+                  <div className="sticky left-0 z-20 border-r border-[#E5E5E5] bg-[#FAFAFA] px-2 py-3 text-left text-xs font-medium text-[#6B7280] sm:px-4 sm:text-sm">
                     University
                   </div>
                   {visibleItems.map((item) => (
@@ -433,8 +380,18 @@ function ProgramCompareContent() {
                       key={item.key}
                       className="border-l border-[#F0F0F0] px-3 py-3 text-center"
                     >
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span className="line-clamp-2 text-sm font-semibold text-[#1E1E1E]">
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        {item.school.logoSrc ? (
+                          <span className="relative h-8 w-8 overflow-hidden rounded-full bg-white ring-1 ring-[#EEF2F7]">
+                            <Image
+                              src={item.school.logoSrc}
+                              alt=""
+                              fill
+                              className="object-contain p-0.5"
+                            />
+                          </span>
+                        ) : null}
+                        <span className="line-clamp-2 text-xs font-semibold text-[#1E1E1E] sm:text-sm">
                           {schoolLabel(item.school)}
                         </span>
                         {selectedSchoolIds.length > 1 && (
@@ -457,13 +414,13 @@ function ProgramCompareContent() {
                     className="grid border-b border-[#F0F0F0] last:border-b-0"
                     style={{ gridTemplateColumns: colTemplate }}
                   >
-                    <div className="sticky left-0 z-10 border-r border-[#E5E5E5] bg-white px-4 py-3.5 text-left text-sm text-[#555555]">
+                    <div className="sticky left-0 z-10 border-r border-[#E5E5E5] bg-white px-2 py-3 text-left text-xs text-[#555555] sm:px-4 sm:py-3.5 sm:text-sm">
                       {row.label}
                     </div>
                     {visibleItems.map((item) => (
                       <div
                         key={`${row.key}-${item.key}`}
-                        className="min-w-0 border-l border-[#F0F0F0] px-3 py-3.5 text-sm text-[#1E1E1E]"
+                        className="min-w-0 border-l border-[#F0F0F0] px-2 py-3 text-xs text-[#1E1E1E] sm:px-3 sm:py-3.5 sm:text-sm"
                       >
                         <div className="break-words text-center">
                           {row.getValue(item)}

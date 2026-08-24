@@ -199,6 +199,8 @@ export type UploadedDocuments = {
 export type ApplicationDoc = {
   _id?: ObjectId;
   applicationNumber: string;
+  /** Legacy unique key; kept in sync with applicationNumber. */
+  reference?: string;
   schoolId: ObjectId;
   applicantUserId?: ObjectId | null;
   applicantEmail: string;

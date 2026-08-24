@@ -10,7 +10,6 @@ import { Header } from "./components/Header";
 import { HeroSlider } from "./components/HeroSlider";
 import { ApproachingDeadlinesSection } from "./components/ApproachingDeadlinesSection";
 import { AdsSection } from "./components/AdsSection";
-import { PartnerSchoolsSection } from "./components/PartnerSchoolsSection";
 import { HomeShell } from "./components/HomeShell";
 
 function HomeTabContent() {
@@ -24,10 +23,6 @@ function HomeTabContent() {
 
       <div className="mx-auto max-w-6xl px-4 sm:px-6 md:px-10">
         <ApproachingDeadlinesSection />
-      </div>
-
-      <div className="mx-auto mt-8 max-w-6xl px-4 sm:mt-10 sm:px-6 md:px-10">
-        <PartnerSchoolsSection />
       </div>
 
       <div className="mx-auto max-w-6xl px-4 sm:px-6 md:px-10">
@@ -46,9 +41,7 @@ function HomeTabContent() {
 export default function Home() {
   return (
     <div className="min-h-screen bg-[#FFFFFF]">
-      <div className="mx-auto max-w-6xl px-6 py-4 md:px-10 md:py-8">
-        <Header />
-      </div>
+      <Header />
 
       <Suspense fallback={<div className="min-h-[40vh] animate-pulse bg-white" />}>
         <HomeShell homeContent={<HomeTabContent />} />

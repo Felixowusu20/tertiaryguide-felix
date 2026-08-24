@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "../../../../../../lib/mongodb";
 import { requireSchoolPortalAccess } from "../../../../../../lib/admin-access";
+import { findSchoolById } from "../../../../../../lib/admissions/schools";
 import {
   applicationsCollection,
   isApplicationStatus,
   serializeApplication,
 } from "../../../../../../lib/admissions/applications";
+import { sendApplicationStatusUpdateToApplicant } from "../../../../../../lib/email";
 
 type Ctx = { params: Promise<{ slug: string; id: string }> };
 
@@ -51,7 +53,15 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       typeof body?.reviewNotes === "string" ? body.reviewNotes.trim() : undefined;
 
     const db = await getDb();
-    const result = await applicationsCollection(db).findOneAndUpdate(
+    const existing = await applicationsCollection(db).findOne({
+      _id: new ObjectId(id),
+      schoolId: auth.schoolId,
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
+    }
+
+    await applicationsCollection(db).updateOne(
       { _id: new ObjectId(id), schoolId: auth.schoolId },
       {
         $set: {
@@ -62,35 +72,40 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
           ...(reviewNotes !== undefined ? { reviewNotes } : {}),
         },
       },
-      { returnDocument: "after" },
     );
-
-    const doc =
-      (result as { value?: typeof result } | null)?.value ??
-      (result as { _id?: ObjectId } | null);
-
-    if (!doc || !("_id" in doc) || !doc._id) {
-      // Mongo driver versions differ; re-fetch
-      const refreshed = await applicationsCollection(db).findOne({
-        _id: new ObjectId(id),
-        schoolId: auth.schoolId,
-      });
-      if (!refreshed) {
-        return NextResponse.json({ error: "Application not found" }, { status: 404 });
-      }
-      return NextResponse.json({
-        ok: true,
-        application: serializeApplication(refreshed),
-      });
-    }
 
     const refreshed = await applicationsCollection(db).findOne({
       _id: new ObjectId(id),
       schoolId: auth.schoolId,
     });
+    if (!refreshed) {
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
+    }
+
+    const serialized = serializeApplication(refreshed);
+    const statusChanged = existing.status !== status;
+
+    if (statusChanged && serialized.email) {
+      try {
+        const school = await findSchoolById(db, String(auth.schoolId));
+        await sendApplicationStatusUpdateToApplicant({
+          to: serialized.email,
+          applicantName: serialized.fullName,
+          schoolName: school?.name || "the school",
+          applicationNumber: serialized.applicationNumber,
+          status,
+          programme: serialized.programme,
+          reviewNotes: serialized.reviewNotes,
+        });
+      } catch (emailError) {
+        console.error("[school-portal/applications/:id] status email", emailError);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
-      application: refreshed ? serializeApplication(refreshed) : null,
+      emailed: statusChanged && Boolean(serialized.email),
+      application: serialized,
     });
   } catch (error) {
     console.error("[school-portal/applications/:id] PATCH", error);

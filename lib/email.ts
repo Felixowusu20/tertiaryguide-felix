@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { absoluteUrl } from "./site-url";
+import { studentStatusCopy } from "./admissions/status-messages";
 
 const apiKey = process.env.RESEND_API_KEY;
 const fromEmailEnv = process.env.EMAIL_FROM;
@@ -733,6 +734,119 @@ export async function sendApplicationSubmittedToSchool(opts: {
 
   if (result.error) {
     console.error("[sendApplicationSubmittedToSchool]", result.error);
+  }
+}
+
+export async function sendApplicationStatusUpdateToApplicant(opts: {
+  to: string;
+  applicantName: string;
+  schoolName: string;
+  applicationNumber: string;
+  status: string;
+  programme?: string | null;
+  reviewNotes?: string | null;
+}): Promise<void> {
+  const {
+    to,
+    applicantName,
+    schoolName,
+    applicationNumber,
+    status,
+    programme,
+    reviewNotes,
+  } = opts;
+  const copy = studentStatusCopy(status);
+  const portalUrl = absoluteUrl("/dashboard/my-forms");
+  const exploreUrl = absoluteUrl("/apply");
+  const firstName = applicantName.split(" ")[0] || "there";
+  const isCare = copy.tone === "care";
+  const accent = isCare ? "#B45309" : copy.tone === "success" ? "#047857" : "#007AFF";
+
+  const text = [
+    `Hello ${firstName},`,
+    "",
+    copy.title,
+    "",
+    copy.message,
+    "",
+    `School: ${schoolName}`,
+    `Application Number: ${applicationNumber}`,
+    programme ? `Programme: ${programme}` : "",
+    reviewNotes ? `Note from the school: ${reviewNotes}` : "",
+    "",
+    `View your application: ${portalUrl}`,
+    isCare ? `Explore other programmes: ${exploreUrl}` : "",
+    "",
+    "With care,",
+    "The TertiaryGuide Team",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const result = await resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: copy.emailSubject(schoolName),
+    text,
+    html: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(copy.emailSubject(schoolName))}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F3F4F6;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F3F4F6;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background-color:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #E5E7EB;">
+          <tr>
+            <td style="padding:28px 28px 8px 28px;">
+              <p style="margin:0 0 8px 0;font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${accent};">${escapeHtml(copy.badge)}</p>
+              <h1 style="margin:0;font-family:system-ui,sans-serif;font-size:22px;line-height:1.3;color:#0F172A;">${escapeHtml(copy.title)}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 8px 28px;font-family:system-ui,sans-serif;font-size:15px;line-height:1.65;color:#334155;">
+              <p style="margin:0 0 12px 0;">Hello ${escapeHtml(firstName)},</p>
+              <p style="margin:0 0 16px 0;">${escapeHtml(copy.message)}</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F8FAFC;border-radius:14px;">
+                <tr>
+                  <td style="padding:14px 16px;font-size:13px;color:#475569;">
+                    <p style="margin:0 0 6px 0;"><strong>School:</strong> ${escapeHtml(schoolName)}</p>
+                    <p style="margin:0 0 6px 0;"><strong>Application number:</strong> ${escapeHtml(applicationNumber)}</p>
+                    ${programme ? `<p style="margin:0;"><strong>Programme:</strong> ${escapeHtml(programme)}</p>` : ""}
+                  </td>
+                </tr>
+              </table>
+              ${
+                reviewNotes
+                  ? `<p style="margin:16px 0 0 0;padding:12px 14px;background:#FFFBEB;border-radius:12px;font-size:13px;"><strong>A note from the school:</strong> ${escapeHtml(reviewNotes)}</p>`
+                  : ""
+              }
+              <p style="margin:22px 0 0 0;">
+                <a href="${escapeHtml(portalUrl)}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;border-radius:999px;padding:12px 18px;font-size:14px;font-weight:600;">View your application</a>
+              </p>
+              ${
+                isCare
+                  ? `<p style="margin:12px 0 0 0;"><a href="${escapeHtml(exploreUrl)}" style="color:#007AFF;font-size:14px;">Explore other programmes</a></p>`
+                  : ""
+              }
+              <p style="margin:24px 0 0 0;font-size:13px;color:#64748B;">With care,<br/>The TertiaryGuide Team</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `,
+  });
+
+  if (result.error) {
+    throw new Error(result.error.message || "Failed to send status email");
   }
 }
 

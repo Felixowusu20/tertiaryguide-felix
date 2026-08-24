@@ -10,6 +10,7 @@ import {
   Building2,
   ClipboardList,
   FileText,
+  GraduationCap,
   HelpCircle,
   LayoutDashboard,
   LogOut,
@@ -36,11 +37,13 @@ import { AdminStaffSection } from "./AdminStaffSection";
 import { AdminPartnerSchoolsSection } from "./AdminPartnerSchoolsSection";
 import { AdminExploreSection } from "./AdminExploreSection";
 import { AdminEmailCampaignsSection } from "./AdminEmailCampaignsSection";
+import { AdminApplicationsSection } from "./AdminApplicationsSection";
 
 type AdminSection =
   | "dashboard"
   | "forms"
   | "partnerSchools"
+  | "applications"
   | "analytics"
   | "users"
   | "checkers"
@@ -597,6 +600,7 @@ export default function AdminDashboardPage() {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "forms", label: "Forms", icon: FileText },
     { id: "partnerSchools", label: "Partner schools", icon: Building2 },
+    { id: "applications", label: "Applications", icon: GraduationCap },
     { id: "formRequests", label: "Form requests", icon: ClipboardList },
     { id: "users", label: "Users", icon: Users },
     { id: "checkers", label: "Checkers", icon: ShieldCheck },
@@ -920,6 +924,8 @@ export default function AdminDashboardPage() {
           <AdminFormsSection />
         ) : activeSection === "partnerSchools" ? (
           <AdminPartnerSchoolsSection />
+        ) : activeSection === "applications" ? (
+          <AdminApplicationsSection />
         ) : activeSection === "formRequests" ? (
           <AdminFormRequestsSection />
         ) : activeSection === "users" ? (

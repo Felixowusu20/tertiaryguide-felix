@@ -6,14 +6,22 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
   ClipboardList,
+  GraduationCap,
   Loader2,
   LogOut,
   Pencil,
 } from "lucide-react";
+import { ApplicationDocuments } from "@/app/components/ApplicationDocuments";
+import { ApplicationStatusCard } from "@/app/components/ApplicationStatusCard";
+import { ProgrammeChoicesList } from "@/app/components/ProgrammeChoicesList";
 import { Header } from "@/app/components/Header";
 import { Footer } from "@/app/components/Footer";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { requireClientAuth } from "@/lib/client-auth";
+import {
+  listProgrammeChoices,
+  type RankedProgrammeChoice,
+} from "@/lib/admissions/programme-choices";
 
 const SESSION_KEY = "tg_applicant_session";
 
@@ -34,6 +42,7 @@ type ApplicationDetail = {
   email: string;
   phone: string | null;
   programme: string | null;
+  programmes?: RankedProgrammeChoice[];
   status: string;
   submittedAt: string;
   updatedAt: string;
@@ -114,6 +123,14 @@ function ApplicantPortalContent() {
     secondChoice: "",
     thirdChoice: "",
     fourthChoice: "",
+    firstChoiceProgramme: "",
+    firstChoiceStream: "",
+    secondChoiceProgramme: "",
+    secondChoiceStream: "",
+    thirdChoiceProgramme: "",
+    thirdChoiceStream: "",
+    fourthChoiceProgramme: "",
+    fourthChoiceStream: "",
   });
   const [education, setEducation] = useState({
     institutionName: "",
@@ -204,6 +221,14 @@ function ApplicantPortalContent() {
       secondChoice: pc.secondChoice || "",
       thirdChoice: pc.thirdChoice || "",
       fourthChoice: pc.fourthChoice || "",
+      firstChoiceProgramme: pc.firstChoiceProgramme || "",
+      firstChoiceStream: pc.firstChoiceStream || "",
+      secondChoiceProgramme: pc.secondChoiceProgramme || "",
+      secondChoiceStream: pc.secondChoiceStream || "",
+      thirdChoiceProgramme: pc.thirdChoiceProgramme || "",
+      thirdChoiceStream: pc.thirdChoiceStream || "",
+      fourthChoiceProgramme: pc.fourthChoiceProgramme || "",
+      fourthChoiceStream: pc.fourthChoiceStream || "",
     });
     const ed = app.educationalBackground?.[0] || {};
     setEducation({
@@ -231,6 +256,47 @@ function ApplicantPortalContent() {
     setSession(next);
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(next));
   };
+
+  useEffect(() => {
+    if (!authReady) return;
+    let cancelled = false;
+    try {
+      const raw = window.localStorage.getItem(SESSION_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Session;
+      if (!saved?.voucherCode || !saved.schoolId) return;
+      void (async () => {
+        const res = await fetch("/api/apply/voucher/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            schoolId: saved.schoolId,
+            voucherCode: saved.voucherCode,
+            serialNumber: saved.serialNumber,
+          }),
+        });
+        const data = await res.json();
+        if (cancelled || !res.ok) return;
+        const next: Session = {
+          schoolId: data.school.id,
+          schoolName: data.school.name,
+          schoolSlug: data.school.slug,
+          brandColor: data.school.brandColor ?? saved.brandColor,
+          voucherCode: data.voucher.voucherCode,
+          serialNumber: data.voucher.serialNumber,
+          application: data.application,
+          canEdit: data.canEdit !== false,
+        };
+        persistSession(next);
+        if (data.application) hydrateForm(data.application);
+      })();
+    } catch {
+      // ignore
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,7 +326,7 @@ function ApplicantPortalContent() {
       persistSession(next);
       if (data.application) {
         hydrateForm(data.application);
-        setMessage(`Welcome back. Status: ${data.application.status}`);
+        setMessage(null);
       } else {
         setMessage("Voucher verified. You have not submitted an application yet.");
       }
@@ -341,25 +407,19 @@ function ApplicantPortalContent() {
     }
   };
 
-  const statusColor = (status: string) => {
-    switch (status) {
-      case "Approved":
-      case "Admitted":
-        return "bg-green-100 text-green-800";
-      case "Rejected":
-        return "bg-red-100 text-red-800";
-      case "Under Review":
-        return "bg-amber-100 text-amber-800";
-      default:
-        return "bg-[var(--school-brand-soft,#DBEAFE)] text-[var(--school-brand,#1D4ED8)]";
-    }
-  };
-
   const activeSchool =
     schools.find((s) => s.id === (session?.schoolId || schoolId)) || null;
   const themeStyle = brandThemeStyle(
     session?.brandColor || activeSchool?.brandColor,
   );
+  const chosenProgrammes = session?.application
+    ? session.application.programmes?.length
+      ? session.application.programmes
+      : listProgrammeChoices(
+          session.application.programmeChoices,
+          session.application.programme,
+        )
+    : [];
 
   if (!authReady) {
     return (
@@ -375,18 +435,22 @@ function ApplicantPortalContent() {
       style={themeStyle}
     >
       <Header />
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <div className="mb-8 flex items-start justify-between gap-4">
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 md:py-10">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--school-brand,#007AFF)] text-white">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--school-brand,#007AFF)] text-white shadow-lg shadow-[var(--school-brand,#007AFF)]/20">
               <ClipboardList className="h-6 w-6" />
             </span>
             <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94A3B8]">
+                Student portal
+              </p>
               <h1 className="text-2xl font-semibold tracking-tight">
                 My application
               </h1>
               <p className="mt-1 text-sm text-[#6B7280]">
-                Log in with your voucher anytime to check status or edit your form.
+                Check status, review your chosen programmes, and edit while the
+                school is still reviewing.
               </p>
             </div>
           </div>
@@ -394,7 +458,7 @@ function ApplicantPortalContent() {
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-xs font-medium"
+              className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-xs font-medium sm:self-center"
             >
               <LogOut className="h-3.5 w-3.5" /> Log out
             </button>
@@ -413,19 +477,21 @@ function ApplicantPortalContent() {
         )}
 
         {!session ? (
-          <section className="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">Student voucher login</h2>
-            <p className="mt-1 text-sm text-[#6B7280]">
-              Use the same Serial Number and PIN from your payment email.
-            </p>
-            <form onSubmit={handleLogin} className="mt-6 grid gap-4">
-              <label className="space-y-1 text-sm">
+          <section className="overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+            <div className="bg-gradient-to-br from-[#EFF6FF] to-white px-6 py-5">
+              <h2 className="text-lg font-semibold">Student voucher login</h2>
+              <p className="mt-1 text-sm text-[#6B7280]">
+                Use the same serial number and PIN from your payment email.
+              </p>
+            </div>
+            <form onSubmit={handleLogin} className="grid gap-4 px-6 py-6 sm:grid-cols-2">
+              <label className="space-y-1 text-sm sm:col-span-2">
                 <span className="font-medium">School</span>
                 <select
                   required
                   value={schoolId}
                   onChange={(e) => setSchoolId(e.target.value)}
-                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 outline-none focus:border-[var(--school-brand,#007AFF)]"
+                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2.5 outline-none focus:border-[var(--school-brand,#007AFF)]"
                 >
                   <option value="">Select school</option>
                   {schools.map((s) => (
@@ -441,7 +507,7 @@ function ApplicantPortalContent() {
                   required
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
-                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 font-mono outline-none focus:border-[var(--school-brand,#007AFF)]"
+                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2.5 font-mono outline-none focus:border-[var(--school-brand,#007AFF)]"
                   placeholder="TG-2026-001234"
                 />
               </label>
@@ -451,115 +517,147 @@ function ApplicantPortalContent() {
                   required
                   value={voucherCode}
                   onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 font-mono outline-none focus:border-[var(--school-brand,#007AFF)]"
+                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2.5 font-mono outline-none focus:border-[var(--school-brand,#007AFF)]"
                   placeholder="HS-8K7D-29PX"
                 />
               </label>
               <button
                 type="submit"
                 disabled={busy}
-                className="rounded-full bg-[var(--school-brand,#007AFF)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)] disabled:opacity-60"
+                className="rounded-full bg-[var(--school-brand,#007AFF)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)] disabled:opacity-60 sm:col-span-2"
               >
                 {busy ? "Signing in…" : "Sign in"}
               </button>
             </form>
-            <p className="mt-4 text-center text-xs text-[#9CA3AF]">
+            <p className="border-t border-[#F1F5F9] px-6 py-4 text-center text-xs text-[#9CA3AF]">
               New applicant?{" "}
               <Link href="/apply" className="text-[var(--school-brand,#007AFF)] underline">
                 Start application
+              </Link>
+              {" · "}
+              <Link href="/dashboard/my-forms" className="text-[var(--school-brand,#007AFF)] underline">
+                My Forms
               </Link>
             </p>
           </section>
         ) : (
           <div className="space-y-6">
-            <section className="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
-              <p className="text-sm text-[#6B7280]">{session.schoolName}</p>
-              {session.application ? (
-                <>
+            <section className="overflow-hidden rounded-[28px] border border-[#E8EEF5] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+              <div className="bg-gradient-to-br from-[var(--school-brand-soft,#DBEAFE)] to-white px-6 py-6">
+                <p className="text-sm font-medium text-[#64748B]">{session.schoolName}</p>
+                {session.application ? (
                   <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <h2 className="text-xl font-semibold">
+                    <h2 className="text-xl font-semibold tracking-tight">
                       {session.application.fullName}
                     </h2>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${statusColor(
-                        session.application.status,
-                      )}`}
-                    >
-                      {session.application.status}
-                    </span>
                   </div>
-                  <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt className="text-[#6B7280]">Application number</dt>
-                      <dd className="font-mono font-semibold">
+                ) : (
+                  <h2 className="mt-1 text-xl font-semibold">Application not submitted</h2>
+                )}
+              </div>
+              {session.application ? (
+                <div className="space-y-6 px-6 py-6">
+                  <ApplicationStatusCard
+                    status={session.application.status}
+                    schoolName={session.schoolName}
+                    reviewNotes={session.application.reviewNotes}
+                  />
+
+                  <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-[#F8FAFC] px-4 py-3">
+                      <dt className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
+                        Application number
+                      </dt>
+                      <dd className="mt-1 truncate font-mono text-sm font-semibold">
                         {session.application.applicationNumber}
                       </dd>
                     </div>
-                    <div>
-                      <dt className="text-[#6B7280]">Programme</dt>
-                      <dd>{session.application.programme || "—"}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[#6B7280]">Submitted</dt>
-                      <dd>
+                    <div className="rounded-2xl bg-[#F8FAFC] px-4 py-3">
+                      <dt className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
+                        Submitted
+                      </dt>
+                      <dd className="mt-1 text-sm font-medium">
                         {new Date(session.application.submittedAt).toLocaleString()}
                       </dd>
                     </div>
-                    <div>
-                      <dt className="text-[#6B7280]">Last updated</dt>
-                      <dd>
+                    <div className="rounded-2xl bg-[#F8FAFC] px-4 py-3">
+                      <dt className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
+                        Last updated
+                      </dt>
+                      <dd className="mt-1 text-sm font-medium">
                         {new Date(session.application.updatedAt).toLocaleString()}
                       </dd>
                     </div>
                   </dl>
-                  {session.application.reviewNotes && (
-                    <p className="mt-4 rounded-xl bg-[#F3F4F6] px-3 py-2 text-sm">
-                      <strong>Note from school:</strong>{" "}
-                      {session.application.reviewNotes}
-                    </p>
-                  )}
-                  <div className="mt-6 flex flex-wrap gap-2">
+
+                  <div className="rounded-[24px] border border-[#EEF2F7] bg-[#F8FBFF] p-4 sm:p-5">
+                    <div className="mb-4 flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4 text-[var(--school-brand,#007AFF)]" />
+                      <h3 className="text-sm font-semibold text-[#0F172A]">
+                        Chosen programmes
+                      </h3>
+                    </div>
+                    <ProgrammeChoicesList
+                      programmes={chosenProgrammes}
+                      columns={4}
+                      emptyLabel="No programme choices on this application yet."
+                    />
+                  </div>
+
+                  <ApplicationDocuments
+                    documents={session.application.documents}
+                    applicationNumber={session.application.applicationNumber}
+                  />
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     {session.canEdit && (
                       <button
                         type="button"
                         onClick={() => setEditing((v) => !v)}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-[var(--school-brand,#007AFF)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)]"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--school-brand,#007AFF)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)]"
                       >
                         <Pencil className="h-4 w-4" />
                         {editing ? "Hide form" : "Edit application"}
                       </button>
                     )}
                     {!session.canEdit && (
-                      <p className="text-sm text-[#6B7280]">
-                        This application can no longer be edited ({session.application.status}).
+                      <p className="self-center text-sm text-[#6B7280]">
+                        This application is no longer open for edits.
                       </p>
                     )}
+                    <Link
+                      href="/dashboard/my-forms"
+                      className="inline-flex items-center justify-center rounded-full border border-[#E2E8F0] px-4 py-2 text-sm font-medium text-[#334155]"
+                    >
+                      Back to My Forms
+                    </Link>
                   </div>
-                </>
+                </div>
               ) : (
-                <div className="mt-4">
+                <div className="px-6 py-6">
                   <div className="flex items-center gap-2 text-amber-700">
                     <CheckCircle2 className="h-5 w-5" />
                     <p className="font-medium">No application submitted yet</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      router.push(
-                        `/apply?school=${session.schoolSlug || session.schoolId}&step=form&voucherCode=${encodeURIComponent(session.voucherCode)}&serialNumber=${encodeURIComponent(session.serialNumber)}`,
-                      )
-                    }
-                    className="mt-4 rounded-full bg-[var(--school-brand,#007AFF)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)]"
-                  >
-                    Complete application form
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(true)}
-                    className="mt-2 ml-2 rounded-full border px-4 py-2 text-sm font-medium"
-                  >
-                    Fill form here
-                  </button>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          `/apply?school=${session.schoolSlug || session.schoolId}&step=form&voucherCode=${encodeURIComponent(session.voucherCode)}&serialNumber=${encodeURIComponent(session.serialNumber)}`,
+                        )
+                      }
+                      className="rounded-full bg-[var(--school-brand,#007AFF)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)]"
+                    >
+                      Complete application form
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(true)}
+                      className="rounded-full border px-4 py-2 text-sm font-medium"
+                    >
+                      Fill form here
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
@@ -599,8 +697,10 @@ function ApplicantPortalContent() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   {(
                     [
-                      ["firstChoice", "First choice"],
-                      ["secondChoice", "Second choice"],
+                      ["firstChoice", "1st choice"],
+                      ["secondChoice", "2nd choice"],
+                      ["thirdChoice", "3rd choice"],
+                      ["fourthChoice", "4th choice"],
                     ] as const
                   ).map(([key, label]) => (
                     <label key={key} className="space-y-1 text-sm">
