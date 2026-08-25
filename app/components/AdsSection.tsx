@@ -7,6 +7,11 @@ import {
   youtubeModalEmbedUrl,
   youtubePreviewEmbedUrl,
 } from "@/lib/adVideo";
+import {
+  pauseInViewVideo,
+  playInViewVideo,
+  useInView,
+} from "@/hooks/use-in-view";
 
 type Ad = {
   id: string;
@@ -69,8 +74,6 @@ export function AdsSection({
   const [closed, setClosed] = useState(false);
   const [dbAds, setDbAds] = useState<Ad[] | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
-  const [mediaInView, setMediaInView] = useState(false);
-  const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const modalVideoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -159,10 +162,11 @@ export function AdsSection({
     [currentAd?.videoUrl],
   );
 
-  const videoModalOpenRef = useRef(false);
-  useEffect(() => {
-    videoModalOpenRef.current = videoModalOpen;
-  }, [videoModalOpen]);
+  const { ref: previewContainerRef, inView: mediaInView } = useInView<HTMLDivElement>({
+    enabled: Boolean(!closed && currentAd?.videoUrl),
+    threshold: 0.15,
+    rootMargin: "120px 0px 120px 0px",
+  });
 
   useEffect(() => {
     setIndex(0);
@@ -170,9 +174,7 @@ export function AdsSection({
 
   const openVideoModal = useCallback(() => {
     const el = previewVideoRef.current;
-    if (el) {
-      el.pause();
-    }
+    if (el) pauseInViewVideo(el);
     setVideoModalOpen(true);
   }, []);
 
@@ -182,9 +184,7 @@ export function AdsSection({
       const el = previewVideoRef.current;
       if (!el) return;
       el.muted = true;
-      el.play().catch(() => {
-        // IO will retry when in view
-      });
+      void playInViewVideo(el).catch(() => undefined);
     });
   }, []);
 
@@ -212,46 +212,32 @@ export function AdsSection({
     setVideoModalOpen(false);
   }, [index]);
 
-  // In-view flag for both YouTube (iframe src) and direct <video> preview
-  useEffect(() => {
-    if (closed || !currentAd?.videoUrl) {
-      setMediaInView(false);
-      return;
-    }
-    const el = previewContainerRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) {
-            if (!videoModalOpenRef.current) setMediaInView(true);
-          } else {
-            setMediaInView(false);
-          }
-        }
-      },
-      { threshold: 0.35, rootMargin: "0px 0px -8% 0px" },
-    );
-    obs.observe(el);
-    return () => {
-      obs.disconnect();
-    };
-  }, [closed, currentAd?.id, currentAd?.videoUrl]);
-
-  // Direct file URL: play muted in view, pause out of view
+  // Direct file URL: play muted when the ad appears / is scrolled to
   useEffect(() => {
     if (closed || !currentAd?.videoUrl || youtubeId) return;
-    if (videoModalOpen) return;
     const v = previewVideoRef.current;
-    if (!v) return;
-    if (mediaInView) {
-      v.muted = true;
-      v.play().catch(() => {
-        // ignore autoplay block
-      });
-    } else {
-      v.pause();
+    if (videoModalOpen) {
+      if (v) pauseInViewVideo(v);
+      return;
     }
+    if (!v) return;
+
+    const tryPlay = () => {
+      v.muted = true;
+      void playInViewVideo(v).catch(() => undefined);
+    };
+
+    if (mediaInView) {
+      tryPlay();
+      v.addEventListener("canplay", tryPlay);
+      v.addEventListener("loadeddata", tryPlay);
+      return () => {
+        v.removeEventListener("canplay", tryPlay);
+        v.removeEventListener("loadeddata", tryPlay);
+      };
+    }
+
+    pauseInViewVideo(v);
   }, [
     closed,
     currentAd?.id,
@@ -392,7 +378,7 @@ export function AdsSection({
                         muted
                         loop
                         playsInline
-                        preload="metadata"
+                        preload={mediaInView ? "auto" : "metadata"}
                         poster={ad.imageUrl || undefined}
                       />
                     )}

@@ -38,6 +38,12 @@ import { AdminPartnerSchoolsSection } from "./AdminPartnerSchoolsSection";
 import { AdminExploreSection } from "./AdminExploreSection";
 import { AdminEmailCampaignsSection } from "./AdminEmailCampaignsSection";
 import { AdminApplicationsSection } from "./AdminApplicationsSection";
+import { NotificationInbox } from "@/app/components/NotificationInbox";
+import {
+  ADMIN_NOTIFICATIONS_KEY,
+  resolveAdminNotificationSection,
+  type AdminNotification,
+} from "@/lib/notifications";
 
 type AdminSection =
   | "dashboard"
@@ -129,13 +135,7 @@ export default function AdminDashboardPage() {
   const [activeSection, setActiveSection] = useState<AdminSection>("dashboard");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [adminNotifications, setAdminNotifications] = useState<
-    {
-      id: string;
-      title: string;
-      body: string;
-      read: boolean;
-      createdAt: string;
-    }[]
+    AdminNotification[]
   >([]);
 
   useEffect(() => {
@@ -299,7 +299,7 @@ export default function AdminDashboardPage() {
     const loadAdminNotifications = () => {
       try {
         if (typeof window === "undefined") return;
-        const raw = window.localStorage.getItem("tg_admin_notifications");
+        const raw = window.localStorage.getItem(ADMIN_NOTIFICATIONS_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
         setAdminNotifications(Array.isArray(parsed) ? parsed : []);
       } catch {
@@ -314,7 +314,7 @@ export default function AdminDashboardPage() {
     };
 
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === "tg_admin_notifications") {
+      if (event.key === ADMIN_NOTIFICATIONS_KEY) {
         loadAdminNotifications();
       }
     };
@@ -382,13 +382,7 @@ export default function AdminDashboardPage() {
         const newOnes = payments.filter((p) => p.paidAt > cursor!);
         if (newOnes.length === 0) return;
 
-        const items: {
-          id: string;
-          title: string;
-          body: string;
-          read: boolean;
-          createdAt: string;
-        }[] = newOnes.map((p) => {
+        const items: AdminNotification[] = newOnes.map((p) => {
           const amountGhs = (p.amount / 100).toFixed(2);
           const notifId = `voucher-form-${p.reference}`;
           const who = p.fullName ? `${p.fullName} <${p.email}>` : p.email;
@@ -399,6 +393,7 @@ export default function AdminDashboardPage() {
               body: `${who} — ${p.school} · GHS ${amountGhs} (ref: ${p.reference}). Awaiting stock; fulfill when a voucher is available.`,
               read: false,
               createdAt: p.paidAt,
+              section: "forms",
             };
           }
           return {
@@ -407,6 +402,7 @@ export default function AdminDashboardPage() {
             body: `${who} — ${p.school} · GHS ${amountGhs} (ref: ${p.reference}). Voucher has been sent by email.`,
             read: false,
             createdAt: p.paidAt,
+            section: "forms",
           };
         });
 
@@ -420,7 +416,7 @@ export default function AdminDashboardPage() {
           const next = [...toPrepend, ...current];
           try {
             window.localStorage.setItem(
-              "tg_admin_notifications",
+              ADMIN_NOTIFICATIONS_KEY,
               JSON.stringify(next),
             );
           } catch {
@@ -452,7 +448,7 @@ export default function AdminDashboardPage() {
     setAdminNotifications((current) => {
       const next = updater(current);
       window.localStorage.setItem(
-        "tg_admin_notifications",
+        ADMIN_NOTIFICATIONS_KEY,
         JSON.stringify(next),
       );
       return next;
@@ -462,6 +458,17 @@ export default function AdminDashboardPage() {
   };
 
   const unreadAdminCount = adminNotifications.filter((n) => !n.read).length;
+
+  const openAdminNotification = (item: { id: string }) => {
+    const match = adminNotifications.find((n) => n.id === item.id);
+    if (!match) return;
+    updateAdminNotifications((current) =>
+      current.map((n) => (n.id === match.id ? { ...n, read: true } : n)),
+    );
+    setNotificationsOpen(false);
+    const section = resolveAdminNotificationSection(match);
+    setActiveSection(section as AdminSection);
+  };
 
   const [visitorsLoading, setVisitorsLoading] = useState(true);
   const [visitorsError, setVisitorsError] = useState<string | null>(null);
@@ -963,7 +970,7 @@ export default function AdminDashboardPage() {
                     Admin notifications
                   </h2>
                   <p className="text-xs text-[#9E9E9E]">
-                    Stay up to date with activity across TertiaryGuide.
+                    Tap an item to open the related admin section.
                   </p>
                 </div>
                 <button
@@ -976,44 +983,39 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
 
-              <div className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3 text-sm sm:px-5 sm:py-4">
-                {adminNotifications.length === 0 ? (
-                  <div className="rounded-2xl border border-[#F0F0F0] bg-[#F9FAFB] px-4 py-3 text-xs text-[#6B7280]">
-                    No admin notifications yet. New form voucher and WASSCE checker activity will appear here.
-                  </div>
-                ) : (
-                  adminNotifications.map((n) => (
-                    <div
-                      key={n.id}
-                      className="rounded-2xl border border-[#F0F0F0] bg-[#F9FAFB] px-4 py-3"
-                    >
-                      <p className="text-xs font-medium uppercase tracking-wide text-[#9E9E9E]">
-                        Activity
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-[#1E1E1E]">
-                        {n.title}
-                      </p>
-                      <p className="mt-1 text-xs text-[#555555]">{n.body}</p>
-                      <div className="mt-2 flex items-center justify-between text-[11px] text-[#9E9E9E]">
-                        <span>{new Date(n.createdAt).toLocaleString()}</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateAdminNotifications((current) =>
-                              current.map((x) =>
-                                x.id === n.id ? { ...x, read: !x.read } : x,
-                              ),
-                            )
-                          }
-                          className="rounded-full border border-[#E0E0E0] px-3 py-1 text-[11px] font-medium text-[#1E1E1E] hover:bg-[#F5F5F5]"
-                        >
-                          {n.read ? "Mark as unread" : "Mark as read"}
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <NotificationInbox
+                items={adminNotifications}
+                emptyTitle="No admin notifications yet"
+                emptyBody="New form voucher and WASSCE checker activity will appear here."
+                onOpen={openAdminNotification}
+                onToggleRead={(id) =>
+                  updateAdminNotifications((current) =>
+                    current.map((n) =>
+                      n.id === id ? { ...n, read: !n.read } : n,
+                    ),
+                  )
+                }
+                onDelete={(id) =>
+                  updateAdminNotifications((current) =>
+                    current.filter((n) => n.id !== id),
+                  )
+                }
+                onMarkAllRead={() =>
+                  updateAdminNotifications((current) =>
+                    current.map((n) => ({ ...n, read: true })),
+                  )
+                }
+                onMarkAllUnread={() =>
+                  updateAdminNotifications((current) =>
+                    current.map((n) => ({ ...n, read: false })),
+                  )
+                }
+                onClearAll={() => {
+                  if (adminNotifications.length === 0) return;
+                  if (!window.confirm("Clear all admin notifications?")) return;
+                  updateAdminNotifications(() => []);
+                }}
+              />
 
               <div className="border-t border-[#E5E5E5] px-4 py-2.5 text-xs text-[#9E9E9E] sm:px-5 sm:py-3">
                 Manage what you receive from

@@ -10,10 +10,18 @@ import {
   Heart,
   Loader2,
   MessageCircle,
+  Play,
   SendHorizontal,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { postTypeLabel, type ExplorePostType } from "@/lib/explore/types";
+import {
+  pauseInViewVideo,
+  playInViewVideo,
+  useInView,
+} from "@/hooks/use-in-view";
 import {
   getStoredUserEmail,
   getStoredUserName,
@@ -94,22 +102,123 @@ function ExploreVideo({
   compact?: boolean;
 }) {
   const [shape, setShape] = useState<MediaShape>("portrait");
+  const [muted, setMuted] = useState(true);
+  const [userPaused, setUserPaused] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const userPausedRef = useRef(false);
+  const mutedRef = useRef(true);
+  const { ref: inViewRef, inView } = useInView<HTMLDivElement>({
+    threshold: 0.35,
+    rootMargin: "40px 0px 40px 0px",
+  });
+
+  userPausedRef.current = userPaused;
+  mutedRef.current = muted;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const tryPlay = () => {
+      if (userPausedRef.current) return;
+      video.muted = mutedRef.current;
+      void playInViewVideo(video).catch(() => {
+        video.muted = true;
+        mutedRef.current = true;
+        setMuted(true);
+        void playInViewVideo(video).catch(() => undefined);
+      });
+    };
+
+    if (inView && !userPaused) {
+      tryPlay();
+      video.addEventListener("canplay", tryPlay);
+      video.addEventListener("loadeddata", tryPlay);
+      return () => {
+        video.removeEventListener("canplay", tryPlay);
+        video.removeEventListener("loadeddata", tryPlay);
+      };
+    }
+
+    pauseInViewVideo(video);
+    if (!inView) setUserPaused(false);
+  }, [inView, userPaused, src]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) video.muted = muted;
+  }, [muted]);
+
+  function toggleMute(e: React.MouseEvent) {
+    e.stopPropagation();
+    const video = videoRef.current;
+    const next = !muted;
+    setMuted(next);
+    mutedRef.current = next;
+    if (!video) return;
+    video.muted = next;
+    if (!next && video.paused && !userPausedRef.current && inView) {
+      void playInViewVideo(video).catch(() => {
+        video.muted = true;
+        mutedRef.current = true;
+        setMuted(true);
+      });
+    }
+  }
+
+  function togglePlay() {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      userPausedRef.current = false;
+      setUserPaused(false);
+      video.muted = mutedRef.current;
+      void playInViewVideo(video).catch(() => undefined);
+    } else {
+      userPausedRef.current = true;
+      setUserPaused(true);
+      pauseInViewVideo(video);
+    }
+  }
 
   return (
     <div
+      ref={inViewRef}
       className={`relative w-full overflow-hidden bg-black ${mediaFrameClass(compact, shape)}`}
     >
       <video
+        ref={videoRef}
         src={src}
-        controls
+        muted
+        loop
         playsInline
-        preload="metadata"
+        preload={inView ? "auto" : "metadata"}
+        onClick={togglePlay}
         onLoadedMetadata={(e) => {
           const video = e.currentTarget;
           setShape(mediaShapeFromRatio(video.videoWidth, video.videoHeight));
         }}
-        className="absolute inset-0 h-full w-full object-cover object-center"
+        className="absolute inset-0 h-full w-full cursor-pointer object-cover object-center"
       />
+      {userPaused && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white shadow-lg">
+            <Play className="h-7 w-7 pl-0.5" fill="currentColor" />
+          </span>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={toggleMute}
+        className="absolute bottom-2.5 right-2.5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/70"
+        aria-label={muted ? "Unmute video" : "Mute video"}
+      >
+        {muted ? (
+          <VolumeX className="h-4 w-4" />
+        ) : (
+          <Volume2 className="h-4 w-4" />
+        )}
+      </button>
     </div>
   );
 }
