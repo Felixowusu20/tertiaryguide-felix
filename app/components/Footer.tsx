@@ -16,7 +16,11 @@ import Image from "next/image";
 import Link from "next/link";
 
 const MY_FORMS_PATH = "/dashboard/my-forms";
+const MY_APPLICATIONS_PATH = "/dashboard/my-applications";
+const MY_CHECKERS_PATH = "/dashboard/my-checkers";
 const SIGNIN_TO_MY_FORMS = `/signin?redirect=${encodeURIComponent(MY_FORMS_PATH)}`;
+const SIGNIN_TO_MY_APPLICATIONS = `/signin?redirect=${encodeURIComponent(MY_APPLICATIONS_PATH)}`;
+const SIGNIN_TO_MY_CHECKERS = `/signin?redirect=${encodeURIComponent(MY_CHECKERS_PATH)}`;
 
 function TikTokIcon({ className }: { className?: string }) {
   return (
@@ -50,12 +54,22 @@ const desktopColumnClass =
 
 export function Footer() {
   const [myFormsHref, setMyFormsHref] = React.useState(SIGNIN_TO_MY_FORMS);
+  const [myApplicationsHref, setMyApplicationsHref] = React.useState(
+    SIGNIN_TO_MY_APPLICATIONS,
+  );
+  const [myCheckersHref, setMyCheckersHref] = React.useState(
+    SIGNIN_TO_MY_CHECKERS,
+  );
 
   React.useEffect(() => {
     const sync = () => {
       if (typeof window === "undefined") return;
       const email = window.localStorage.getItem("tg_user_email");
       setMyFormsHref(email ? MY_FORMS_PATH : SIGNIN_TO_MY_FORMS);
+      setMyApplicationsHref(
+        email ? MY_APPLICATIONS_PATH : SIGNIN_TO_MY_APPLICATIONS,
+      );
+      setMyCheckersHref(email ? MY_CHECKERS_PATH : SIGNIN_TO_MY_CHECKERS);
     };
     sync();
     const onStorage = (e: StorageEvent) => {
@@ -74,6 +88,8 @@ export function Footer() {
     { href: "/wassce-checker", label: "WASSCE Checkers" },
     { href: "/program-search", label: "Program Search" },
     { href: myFormsHref, label: "My Forms" },
+    { href: myApplicationsHref, label: "My Applications" },
+    { href: myCheckersHref, label: "My Checkers" },
     { href: "/contact", label: "Contact Us" },
   ];
 
@@ -123,7 +139,7 @@ export function Footer() {
               />
             </Link>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/75 lg:mt-5 lg:text-[15px] lg:leading-7">
-              Your trusted guide to university forms, programmes, and WASSCE checkers in Ghana.
+              Your trusted resource to higher education — university forms, programmes, and WASSCE checkers in Ghana.
             </p>
           </section>
 

@@ -32,6 +32,7 @@ import {
   blendBrandColors,
 } from "@/lib/brand-theme";
 import { isDeadlineCalendarExpired } from "@/lib/deadlines";
+import { ApplicationDocuments } from "../../components/ApplicationDocuments";
 import { ProgrammesSection } from "./ProgrammesSection";
 import { BlogSection } from "./BlogSection";
 import { SettingsSection } from "./SettingsSection";
@@ -152,6 +153,7 @@ function SchoolAdminPortalContent() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [actorLabel, setActorLabel] = useState("");
 
   useEffect(() => {
@@ -301,6 +303,13 @@ function SchoolAdminPortalContent() {
   }, [searchParams, applications]);
 
   const updateStatus = async (id: string, status: string) => {
+    if (status === "Rejected") {
+      const ok = window.confirm(
+        "Send this student a kind update that a place isn’t available this round? They will receive an email and see a supportive message in their portal.",
+      );
+      if (!ok) return;
+    }
+    setStatusNotice(null);
     const res = await adminFetch(`/api/school-portal/${slug}/applications/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -315,6 +324,13 @@ function SchoolAdminPortalContent() {
         prev?.id === id ? { ...prev, ...data.application } : prev,
       );
       void loadDashboard();
+      setStatusNotice(
+        data.emailed
+          ? "Status saved. The student has been emailed and will see this update in their portal."
+          : "Status saved. It will show on the student’s portal.",
+      );
+    } else {
+      setError(data.error || "Could not update status");
     }
   };
 
@@ -771,6 +787,11 @@ function SchoolAdminPortalContent() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-4 text-sm space-y-4">
+              {statusNotice ? (
+                <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  {statusNotice}
+                </p>
+              ) : null}
               <p>
                 <strong>Status:</strong> {selected.status}
               </p>
@@ -795,8 +816,15 @@ function SchoolAdminPortalContent() {
                   </ul>
                 </div>
               )}
+              <ApplicationDocuments
+                documents={selected.documents}
+                applicationNumber={selected.applicationNumber}
+              />
             </div>
             <div className="flex flex-wrap gap-2 border-t px-5 py-4">
+              <p className="mb-1 w-full text-[11px] text-[#6B7280]">
+                Changing status emails the student and updates their portal.
+              </p>
               <button
                 type="button"
                 onClick={() => void updateStatus(selected.id, "Under Review")}
@@ -830,7 +858,7 @@ function SchoolAdminPortalContent() {
                 onClick={downloadSelected}
                 className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs"
               >
-                <Download className="h-3.5 w-3.5" /> Download
+                <Download className="h-3.5 w-3.5" /> Download summary
               </button>
             </div>
           </div>

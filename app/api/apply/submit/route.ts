@@ -47,7 +47,11 @@ export async function POST(req: NextRequest) {
     }
 
     const db = await getDb();
-    await ensureApplicationIndexes(db);
+    try {
+      await ensureApplicationIndexes(db);
+    } catch (indexError) {
+      console.error("[apply/submit] indexes", indexError);
+    }
 
     const school = await findSchoolById(db, schoolId);
     if (!school || !school.isPartner || school.isActive === false) {
@@ -163,6 +167,8 @@ export async function POST(req: NextRequest) {
 
     const doc = {
       applicationNumber,
+      // Legacy unique index is on `reference`; keep both in sync.
+      reference: applicationNumber,
       schoolId: new ObjectId(schoolId),
       applicantUserId,
       voucherId,
@@ -233,6 +239,18 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("[apply/submit]", error);
-    return NextResponse.json({ error: "Failed to submit application" }, { status: 500 });
+    const duplicate =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: number }).code === 11000;
+    return NextResponse.json(
+      {
+        error: duplicate
+          ? "An application with these details already exists. Log in with your voucher to continue."
+          : "Failed to submit application",
+      },
+      { status: duplicate ? 409 : 500 },
+    );
   }
 }

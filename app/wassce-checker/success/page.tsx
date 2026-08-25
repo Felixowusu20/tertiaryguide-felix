@@ -132,6 +132,8 @@ function WassceCheckerSuccessContent() {
                   body: bodyBase,
                   read: false,
                   createdAt: new Date().toISOString(),
+                  href: "/dashboard/my-checkers",
+                  kind: "checker",
                 },
                 ...(Array.isArray(existing) ? existing : []),
               ];
@@ -161,6 +163,7 @@ function WassceCheckerSuccessContent() {
                       : "A WASSCE checker has just been purchased.",
                 read: false,
                 createdAt: new Date().toISOString(),
+                section: "checkers",
               },
               ...(Array.isArray(adminExisting) ? adminExisting : []),
             ];

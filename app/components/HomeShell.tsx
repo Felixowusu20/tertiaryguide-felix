@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Compass, Home } from "lucide-react";
 import { ExploreFeed } from "./ExploreFeed";
 
 type View = "home" | "explore";
@@ -68,7 +67,7 @@ export function HomeShell({ homeContent }: { homeContent: React.ReactNode }) {
   };
 
   const tabClass = (active: boolean) =>
-    `relative inline-flex h-12 items-center justify-center gap-1.5 px-5 text-sm font-semibold transition sm:text-[15px] ${
+    `relative inline-flex h-12 min-w-[6.5rem] items-center justify-center px-6 text-sm font-semibold transition sm:min-w-[7.5rem] sm:text-[15px] ${
       active ? "text-[#1E1E1E]" : "text-[#6B7280] hover:text-[#1E1E1E]"
     }`;
 
@@ -80,16 +79,12 @@ export function HomeShell({ homeContent }: { homeContent: React.ReactNode }) {
     >
       <div className="sticky top-14 z-30 border-b border-[#E8E8E8] bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/90 md:top-16">
         <div className="mx-auto flex h-12 max-w-6xl items-center justify-center px-2 sm:px-4 md:px-10">
-          {/* Mobile: Home + Explore for swipe/tap */}
           <button
             type="button"
             onClick={showHome}
             aria-pressed={view === "home"}
-            className={`${tabClass(view === "home")} md:hidden`}
+            className={tabClass(view === "home")}
           >
-            <Home
-              className={`h-4 w-4 ${view === "home" ? "text-[#007AFF]" : ""}`}
-            />
             Home
             {view === "home" && (
               <span className="absolute inset-x-3 bottom-0 h-1 rounded-full bg-[#007AFF]" />
@@ -101,11 +96,6 @@ export function HomeShell({ homeContent }: { homeContent: React.ReactNode }) {
             aria-pressed={view === "explore"}
             className={tabClass(view === "explore")}
           >
-            <Compass
-              className={`h-4 w-4 ${
-                view === "explore" ? "text-[#007AFF]" : ""
-              }`}
-            />
             Explore
             {view === "explore" && (
               <span className="absolute inset-x-3 bottom-0 h-1 rounded-full bg-[#007AFF]" />
@@ -114,15 +104,26 @@ export function HomeShell({ homeContent }: { homeContent: React.ReactNode }) {
         </div>
       </div>
 
-      {view === "home" ? (
-        <div className="animate-in fade-in duration-200">{homeContent}</div>
-      ) : (
-        <div className="animate-in fade-in slide-in-from-right-2 duration-200">
-          <div className="bg-gradient-to-b from-[#F4F8FF] via-white to-white py-4 sm:py-6">
-            <ExploreFeed embedded />
-          </div>
+      <div className="relative overflow-hidden">
+        <div
+          className={`transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            view === "home"
+              ? "relative translate-x-0"
+              : "pointer-events-none invisible absolute inset-x-0 top-0 -translate-x-full"
+          }`}
+        >
+          {homeContent}
         </div>
-      )}
+        <div
+          className={`transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            view === "explore"
+              ? "relative translate-x-0"
+              : "pointer-events-none invisible absolute inset-x-0 top-0 translate-x-full"
+          }`}
+        >
+          <ExploreFeed embedded />
+        </div>
+      </div>
     </div>
   );
 }

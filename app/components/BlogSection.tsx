@@ -80,16 +80,16 @@ export function BlogSection() {
                 href={`/blog/${post.slug}`}
                 className="block h-full"
               >
-                <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#F0F0F0] bg-white transition-shadow hover:shadow-md">
+                <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#E8EEF5] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-md">
 
                   {/* Image */}
-                  <div className="relative aspect-[16/10] w-full bg-[#F3F4F6]">
+                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#F3F4F6]">
                     {post.featuredImageUrl ? (
                       <Image
                         src={post.featuredImageUrl}
                         alt={post.title}
                         fill
-                        className="object-contain p-1"
+                        className="object-cover"
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       />
                     ) : (

@@ -10,7 +10,7 @@ const siteUrl = getSiteUrl();
 const defaultTitle =
   "TertiaryGuide — University forms, programmes & WASSCE checkers in Ghana";
 const defaultDescription =
-  "Find and compare tertiary programmes, buy university application forms, get WASSCE checkers, and track deadlines. Your one place for higher education in Ghana.";
+  "Your trusted resource to higher education in Ghana. Find and compare programmes, buy university application forms, get WASSCE checkers, and track deadlines.";
 
 const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
       { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
     ],
     shortcut: "/favicon-32.png",
-    apple: "/logo.png",
+    apple: "/apple-touch-icon.png",
   },
 };
 

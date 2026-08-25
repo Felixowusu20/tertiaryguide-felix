@@ -105,6 +105,7 @@ export type CachedSchool = {
   id: string;
   name: string;
   alias: string | null;
+  slug?: string | null;
   logoSrc: string | null;
   logoAlt: string | null;
   priceGhs: number | null;
@@ -113,6 +114,7 @@ export type CachedSchool = {
   preRequisite?: string | null;
   durationYears?: number | null;
   isVerified?: boolean;
+  isPartner?: boolean;
   /** All categories (filters, display). */
   categories: string[];
   /** @deprecated first category; prefer categories */

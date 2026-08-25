@@ -175,10 +175,13 @@ export default async function BlogListPage({
               </div>
   
               {/* POSTS */}
-              <div className="flex flex-col gap-16">
+              <div className="flex flex-col gap-6">
                 {posts.length > 0 ? (
                   posts.map((post) => (
-                    <article key={post.slug} className="group">
+                    <article
+                      key={post.slug}
+                      className="group overflow-hidden rounded-3xl border border-[#E8EEF5] bg-white p-5 shadow-[0_8px_28px_rgba(15,23,42,0.05)] sm:p-6"
+                    >
   
                       {/* IMAGE */}
                       {post.featuredImageUrl ? (
@@ -186,14 +189,15 @@ export default async function BlogListPage({
                           href={`/blog/${post.slug}`}
                           className="mb-6 block overflow-hidden rounded-2xl bg-[#F3F4F6] shadow-sm ring-1 ring-gray-900/10"
                         >
-                          <Image
-                            src={post.featuredImageUrl}
-                            alt={post.title}
-                            width={1400}
-                            height={900}
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 70vw, 800px"
-                            className="mx-auto h-auto w-full max-h-[min(70vh,640px)] object-contain transition duration-300 group-hover:opacity-95"
-                          />
+                          <div className="relative aspect-[16/9] w-full">
+                            <Image
+                              src={post.featuredImageUrl}
+                              alt={post.title}
+                              fill
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 70vw, 800px"
+                              className="object-cover transition duration-300 group-hover:opacity-95"
+                            />
+                          </div>
                         </Link>
                       ) : (
                         <div className="mb-6 flex h-48 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">

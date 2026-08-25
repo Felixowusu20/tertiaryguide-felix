@@ -44,10 +44,21 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
             .filter((s: unknown): s is string => typeof s === "string")
             .map((s: string) => s.trim())
             .filter(Boolean)
-        : [];
+        : typeof body.intakeOptions === "string"
+          ? body.intakeOptions.split(",").map((s: string) => s.trim()).filter(Boolean)
+          : [];
     }
     if (typeof body?.isActive === "boolean") $set.isActive = body.isActive;
     if (typeof body?.cutoff === "string") $set.cutoff = body.cutoff.trim() || null;
+    if (typeof body?.preRequisite === "string") {
+      $set.preRequisite = body.preRequisite.trim() || null;
+    }
+    if (body?.durationYears !== undefined) {
+      $set.durationYears =
+        body.durationYears === "" || body.durationYears == null
+          ? null
+          : Number(body.durationYears) || null;
+    }
 
     const db = await getDb();
     await admissionProgrammesCollection(db).updateOne(

@@ -280,14 +280,13 @@ export default async function BlogPostPage({
   
           {/* Featured Image */}
           {post.featuredImageUrl && (
-            <div className="mb-10 overflow-hidden rounded-3xl bg-[#F3F4F6] shadow-md ring-1 ring-gray-900/5">
+            <div className="relative mb-10 aspect-[16/9] w-full overflow-hidden rounded-3xl bg-[#F3F4F6] shadow-md ring-1 ring-gray-900/5 sm:aspect-[2/1]">
               <Image
                 src={post.featuredImageUrl}
                 alt={post.title}
-                width={1600}
-                height={1000}
+                fill
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1100px"
-                className="mx-auto h-auto w-full max-h-[min(80vh,820px)] object-contain"
+                className="object-cover"
                 priority
               />
             </div>
@@ -395,7 +394,7 @@ export default async function BlogPostPage({
                           src={rel.featuredImageUrl}
                           alt={rel.title}
                           fill
-                          className="object-contain p-0.5 transition group-hover:opacity-90"
+                          className="object-cover transition group-hover:opacity-90"
                           sizes="96px"
                         />
                       ) : (

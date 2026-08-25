@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Building2,
+  BadgeCheck,
   ExternalLink,
   ImagePlus,
   Loader2,
@@ -37,6 +38,7 @@ type PartnerSchool = {
   deadline: string | null;
   brandColor: string | null;
   showBlogOnMain: boolean;
+  isVerified?: boolean;
 };
 
 const emptyForm = {
@@ -46,6 +48,7 @@ const emptyForm = {
   email: "",
   phone: "",
   showBlogOnMain: false,
+  isVerified: true,
   adminUsername: "",
   adminPassword: "",
   adminEmail: "",
@@ -129,6 +132,7 @@ export function AdminPartnerSchoolsSection() {
       email: school.email || "",
       phone: school.phone || "",
       showBlogOnMain: school.showBlogOnMain === true,
+      isVerified: school.isVerified !== false,
       adminUsername: "",
       adminPassword: "",
       adminEmail: "",
@@ -187,6 +191,7 @@ export function AdminPartnerSchoolsSection() {
         email: form.email || undefined,
         phone: form.phone || undefined,
         showBlogOnMain: form.showBlogOnMain,
+        isVerified: form.isVerified !== false,
         ...(logoSrc
           ? { logoSrc, logoAlt: form.alias || form.name }
           : editingId && !existingLogoSrc && !logoFile
@@ -429,6 +434,20 @@ export function AdminPartnerSchoolsSection() {
           <label className="flex items-start gap-2 text-sm md:col-span-2">
             <input
               type="checkbox"
+              checked={form.isVerified !== false}
+              onChange={(e) => setForm((f) => ({ ...f, isVerified: e.target.checked }))}
+              className="mt-0.5 h-4 w-4 rounded border-[#D1D5DB]"
+            />
+            <span>
+              <span className="font-medium text-[#374151]">Verified partner school</span>
+              <span className="mt-0.5 block text-xs text-[#9CA3AF]">
+                Shows the verified checkmark next to this school on public pages.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm md:col-span-2">
+            <input
+              type="checkbox"
               checked={form.showBlogOnMain}
               onChange={(e) => setForm((f) => ({ ...f, showBlogOnMain: e.target.checked }))}
               className="mt-0.5 h-4 w-4 rounded border-[#D1D5DB]"
@@ -569,11 +588,20 @@ export function AdminPartnerSchoolsSection() {
                         </div>
                         <div className="min-w-0">
                           <p
-                            className={`truncate text-sm font-medium ${
+                            className={`flex items-center gap-1 truncate text-sm font-medium ${
                               selected ? "text-white" : "text-[#1E1E1E] group-hover:text-white"
                             }`}
                           >
                             {displayName(s)}
+                            {s.isVerified !== false && (
+                              <BadgeCheck
+                                className={`h-3.5 w-3.5 shrink-0 ${
+                                  selected ? "text-white" : "text-[#007AFF] group-hover:text-white"
+                                }`}
+                                fill="currentColor"
+                                stroke={selected ? "transparent" : "white"}
+                              />
+                            )}
                           </p>
                           <div className="mt-0.5 flex items-center gap-1.5">
                             <span

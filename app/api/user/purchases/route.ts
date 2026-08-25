@@ -202,15 +202,20 @@ export async function GET(req: NextRequest) {
         programmeLevel: v.programmeLevel ?? "undergraduate",
         status: v.isUsed || v.status === "used" ? "used" : "issued",
         application: application
-          ? {
-              id: String(application._id),
-              applicationNumber: application.applicationNumber,
-              status: application.status,
-              submittedAt: application.submittedAt?.toISOString?.()
-                ? application.submittedAt.toISOString()
-                : null,
-              detail: serializeApplication(application),
-            }
+          ? (() => {
+              const detail = serializeApplication(application);
+              return {
+                id: String(application._id),
+                applicationNumber: application.applicationNumber || detail.applicationNumber,
+                status: application.status,
+                submittedAt: application.submittedAt?.toISOString?.()
+                  ? application.submittedAt.toISOString()
+                  : null,
+                programmes: detail.programmes,
+                programme: detail.programme,
+                detail,
+              };
+            })()
           : null,
       };
     });
@@ -241,11 +246,77 @@ export async function GET(req: NextRequest) {
         };
       });
 
+    const linkedAppIds = new Set(
+      [...partnerApps, ...Array.from(appByVoucherId.values())].map((a) =>
+        String(a._id),
+      ),
+    );
+    const emailApps = await applicationsCollection(db)
+      .find({
+        $or: [{ applicantEmail: email }, { "personalInfo.email": email }],
+      })
+      .toArray();
+    const standaloneApps = emailApps.filter(
+      (app) => !linkedAppIds.has(String(app._id)),
+    );
+    const standaloneSchoolIds = standaloneApps
+      .map((app) => app.schoolId)
+      .filter((id): id is ObjectId => Boolean(id));
+    const standaloneSchools =
+      standaloneSchoolIds.length > 0
+        ? await db
+            .collection("schools")
+            .find({ _id: { $in: standaloneSchoolIds } })
+            .toArray()
+        : [];
+    for (const school of standaloneSchools) {
+      partnerSchoolMap[school._id.toString()] = {
+        name: school.name,
+        alias: school.alias ?? null,
+        logo: school.logoSrc ?? null,
+        slug: school.slug ?? null,
+      };
+    }
+    const standalonePartner = standaloneApps.map((application) => {
+      const schoolInfo = partnerSchoolMap[String(application.schoolId)] || {
+        name: "Unknown School",
+        alias: null,
+        logo: null,
+        slug: null,
+      };
+      const detail = serializeApplication(application);
+      return {
+        id: `app-${String(application._id)}`,
+        type: "partner_voucher" as const,
+        schoolId: String(application.schoolId),
+        schoolName: schoolInfo.alias?.trim() || schoolInfo.name,
+        schoolFullName: schoolInfo.name,
+        schoolLogo: schoolInfo.logo,
+        schoolSlug: schoolInfo.slug,
+        date: application.submittedAt || application.updatedAt || new Date(),
+        voucher: null as { serial: string; pin: string } | null,
+        programmeLevel: "undergraduate" as const,
+        status: "used" as const,
+        application: {
+          id: String(application._id),
+          applicationNumber: application.applicationNumber || detail.applicationNumber,
+          status: application.status,
+          submittedAt: application.submittedAt?.toISOString?.()
+            ? application.submittedAt.toISOString()
+            : null,
+          programmes: detail.programmes,
+          programme: detail.programme,
+          detail,
+        },
+      };
+    });
+
     const allPurchases = [
       ...enrichedFormPayments,
       ...enrichedWasscePayments,
       ...enrichedPartner,
       ...pendingPartner,
+      ...standalonePartner,
     ].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
     );

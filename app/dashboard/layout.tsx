@@ -103,6 +103,7 @@ export default function DashboardLayout({
   const navItems: NavItem[] = [
     { label: "Personal Info", href: "/dashboard/personal-info" },
     { label: "My Forms", href: "/dashboard/my-forms" },
+    { label: "My Applications", href: "/dashboard/my-applications" },
     { label: "Assistance", href: "/dashboard/assistance" },
     { label: "My checkers", href: "/dashboard/my-checkers" },
     { label: "Password", href: "/dashboard/password" },
@@ -212,7 +213,14 @@ export default function DashboardLayout({
             </div>
           </nav>
 
-          <section className="min-w-0 flex-1 space-y-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6 md:p-8">
+          <section
+            className={
+              pathname === "/dashboard/my-forms" ||
+              pathname === "/dashboard/my-applications"
+                ? "min-w-0 flex-1"
+                : "min-w-0 flex-1 space-y-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6 md:p-8"
+            }
+          >
             {children}
           </section>
         </main>

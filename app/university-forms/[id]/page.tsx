@@ -9,6 +9,7 @@ import { Footer } from "../../components/Footer";
 import { AuthModal } from "../../components/AuthModal";
 import { CutoffModal } from "../../components/CutoffModal";
 import { isDeadlineCalendarExpired } from "@/lib/deadlines";
+import { catalogSchoolHref } from "@/lib/school-links";
 import {
   PROGRAMME_LEVEL_LABELS,
   type ProgrammeLevel,
@@ -29,6 +30,7 @@ type SchoolDetail = {
   id: string;
   name: string;
   alias: string | null;
+  slug?: string | null;
   logoSrc: string | null;
   logoAlt: string | null;
   priceGhs: number | null;
@@ -37,6 +39,7 @@ type SchoolDetail = {
   voucherPrice?: number | null;
   deadline: string | null;
   about: string | null;
+  isPartner?: boolean;
 };
 
 export default function SchoolDetailsPage() {
@@ -72,7 +75,12 @@ export default function SchoolDetailsPage() {
           throw new Error(data.error || "Failed to load school");
         }
         if (!cancelled) {
-          setSchool(data.school ?? null);
+          const loaded = data.school ?? null;
+          if (loaded?.isPartner) {
+            router.replace(catalogSchoolHref(loaded));
+            return;
+          }
+          setSchool(loaded);
         }
       } catch (err) {
         if (!cancelled) {
@@ -257,7 +265,6 @@ export default function SchoolDetailsPage() {
                         }
                       >
                         {formatDeadline(school.deadline)}
-                        {isDeadlineCalendarExpired(school.deadline) && " (Expired)"}
                       </span>
                     </p>
                   </div>
@@ -279,7 +286,6 @@ export default function SchoolDetailsPage() {
                   Deadline:{" "}
                   <span className={isDeadlineCalendarExpired(school.deadline) ? "text-[#DC2626]" : "text-[#E33F3F]"}>
                     {formatDeadline(school.deadline)}
-                    {isDeadlineCalendarExpired(school.deadline) && " (Expired)"}
                   </span>
                 </p>
 

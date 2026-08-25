@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  BadgeCheck,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -397,8 +398,16 @@ function ApplyContent() {
             </span>
           )}
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {school ? schoolLabel(school) : "Apply for admission"}
+            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              <span className="min-w-0">{school ? schoolLabel(school) : "Apply for admission"}</span>
+              {school && (
+                <BadgeCheck
+                  className="h-6 w-6 shrink-0 text-[#007AFF]"
+                  fill="currentColor"
+                  stroke="white"
+                  aria-label="Verified partner school"
+                />
+              )}
             </h1>
             <p className="mt-1 text-sm text-[#6B7280]">
               {school
@@ -494,6 +503,14 @@ function ApplyContent() {
                                 ? "text-white"
                                 : "text-[#1E1E1E] group-hover:text-white"
                             }`}
+                          />
+                          <BadgeCheck
+                            className={`h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 ${
+                              selected ? "text-white" : "text-[#007AFF] group-hover:text-white"
+                            }`}
+                            fill="currentColor"
+                            stroke="white"
+                            aria-label="Verified partner school"
                           />
                         </div>
                         <span

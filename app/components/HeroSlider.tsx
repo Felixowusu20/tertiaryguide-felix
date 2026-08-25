@@ -49,9 +49,9 @@ export function HeroSlider() {
       {/* Mobile Hero Slider */}
       <section className="mt-4 flex flex-col gap-5 md:hidden">
         <div className="space-y-3 px-1">
-          <p className="inline-flex items-center gap-2 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-medium text-[#007AFF] shadow-sm border border-gray-50">
+          <p className="inline-flex items-center gap-2 rounded-full border border-gray-50 bg-white px-2.5 py-0.5 text-[10px] font-medium text-[#007AFF] shadow-sm">
             <span className="h-1 w-1 rounded-full bg-[#007AFF]" />
-            Featured school
+            Your trusted resource to higher education
           </p>
           {/* Reduced from text-3xl to text-2xl */}
           <h1 className="text-2xl font-semibold leading-tight text-[#252525]">
@@ -153,7 +153,7 @@ export function HeroSlider() {
             </div>
 
             <h1 className="text-3xl font-semibold leading-tight md:text-4xl lg:text-[40px] lg:leading-[1.1]">
-              Discover convenience <br /> at Tertiary Guide
+              Your trusted resource <br /> to higher education
             </h1>
             <p className="max-w-md text-sm leading-relaxed text-white/85 md:text-base">
               {slide.tagline}
