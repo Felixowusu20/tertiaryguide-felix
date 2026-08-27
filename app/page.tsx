@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { ServicesSection } from "./components/ServicesSection";
 import { ProgramSearchPromo } from "./components/ProgramSearchPromo";
 import { FindCompareCoursesSection } from "./components/FindCompareCoursesSection";
@@ -12,10 +13,33 @@ import { ApproachingDeadlinesSection } from "./components/ApproachingDeadlinesSe
 import { AdsSection } from "./components/AdsSection";
 import { HomeShell } from "./components/HomeShell";
 
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}): Promise<Metadata> {
+  const { tab } = await searchParams;
+  if (tab === "explore") {
+    return {
+      title: "Explore flyers, deadlines and school news",
+      description:
+        "Browse school flyers, admission updates, and deadline reminders from TertiaryGuide.",
+      alternates: { canonical: "/explore" },
+      openGraph: {
+        url: "/explore",
+        title: "Explore flyers, deadlines and school news | TertiaryGuide",
+      },
+    };
+  }
+  return {
+    alternates: { canonical: "/" },
+  };
+}
+
 function HomeTabContent() {
   return (
     <>
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-4 md:gap-8 md:px-10 md:py-6">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-3 md:gap-8 md:px-10 md:py-4">
         <HeroSlider />
       </div>
 

@@ -18,6 +18,7 @@ import { Header } from "@/app/components/Header";
 import { Footer } from "@/app/components/Footer";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { requireClientAuth } from "@/lib/client-auth";
+import { partnerSchoolBuyFormsHref } from "@/lib/school-links";
 import {
   listProgrammeChoices,
   type RankedProgrammeChoice,
@@ -51,6 +52,12 @@ type ApplicationDetail = {
   programmeChoices?: Record<string, string | undefined> | null;
   educationalBackground?: Record<string, string | undefined>[];
   examinationInfo?: Record<string, string | undefined> | null;
+  additionalExaminations?: Record<string, string | undefined>[] | null;
+  examinationSittings?: Array<
+    Record<string, string | undefined> & {
+      results?: { subject: string; grade: string }[];
+    }
+  > | null;
   results?: { subject: string; grade: string }[];
   documents?: Record<string, string | undefined> | null;
   reviewNotes?: string | null;
@@ -89,63 +96,9 @@ function ApplicantPortalContent() {
   const [voucherCode, setVoucherCode] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [session, setSession] = useState<Session | null>(null);
-  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-
-  const [personal, setPersonal] = useState({
-    title: "",
-    surname: "",
-    firstName: "",
-    middleName: "",
-    gender: "",
-    dateOfBirth: "",
-    maritalStatus: "",
-    homeRegion: "",
-    homeCountry: "Ghana",
-    occupation: "",
-    phoneNumber: "",
-    email: "",
-    postalAddress: "",
-    residentialAddress: "",
-  });
-  const [guardian, setGuardian] = useState({
-    guardianName: "",
-    relationship: "",
-    occupation: "",
-    phoneNumber: "",
-    email: "",
-    address: "",
-  });
-  const [programmes, setProgrammes] = useState({
-    firstChoice: "",
-    secondChoice: "",
-    thirdChoice: "",
-    fourthChoice: "",
-    firstChoiceProgramme: "",
-    firstChoiceStream: "",
-    secondChoiceProgramme: "",
-    secondChoiceStream: "",
-    thirdChoiceProgramme: "",
-    thirdChoiceStream: "",
-    fourthChoiceProgramme: "",
-    fourthChoiceStream: "",
-  });
-  const [education, setEducation] = useState({
-    institutionName: "",
-    programmePursued: "",
-    startDate: "",
-    endDate: "",
-  });
-  const [exam, setExam] = useState({
-    examType: "WASSCE",
-    sitting: "",
-    examYear: "",
-    indexNumber: "",
-  });
-  const [results, setResults] = useState([{ subject: "", grade: "" }]);
-  const [documents, setDocuments] = useState<Record<string, string>>({});
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
@@ -173,7 +126,6 @@ function ApplicantPortalContent() {
           setSchoolId(saved.schoolId);
           setVoucherCode(saved.voucherCode);
           setSerialNumber(saved.serialNumber);
-          if (saved.application) hydrateForm(saved.application);
         }
       }
     } catch {
@@ -187,70 +139,6 @@ function ApplicantPortalContent() {
     if (serial) setSerialNumber(serial.toUpperCase());
     if (sid) setSchoolId(sid);
   }, [authReady, searchParams]);
-
-  function hydrateForm(app: ApplicationDetail) {
-    const p = app.personalInfo || {};
-    setPersonal({
-      title: p.title || "",
-      surname: p.surname || "",
-      firstName: p.firstName || "",
-      middleName: p.middleName || "",
-      gender: p.gender || "",
-      dateOfBirth: p.dateOfBirth || "",
-      maritalStatus: p.maritalStatus || "",
-      homeRegion: p.homeRegion || "",
-      homeCountry: p.homeCountry || "Ghana",
-      occupation: p.occupation || "",
-      phoneNumber: p.phoneNumber || app.phone || "",
-      email: p.email || app.email || "",
-      postalAddress: p.postalAddress || "",
-      residentialAddress: p.residentialAddress || "",
-    });
-    const g = app.guardianInfo || {};
-    setGuardian({
-      guardianName: g.guardianName || "",
-      relationship: g.relationship || "",
-      occupation: g.occupation || "",
-      phoneNumber: g.phoneNumber || "",
-      email: g.email || "",
-      address: g.address || "",
-    });
-    const pc = app.programmeChoices || {};
-    setProgrammes({
-      firstChoice: pc.firstChoice || "",
-      secondChoice: pc.secondChoice || "",
-      thirdChoice: pc.thirdChoice || "",
-      fourthChoice: pc.fourthChoice || "",
-      firstChoiceProgramme: pc.firstChoiceProgramme || "",
-      firstChoiceStream: pc.firstChoiceStream || "",
-      secondChoiceProgramme: pc.secondChoiceProgramme || "",
-      secondChoiceStream: pc.secondChoiceStream || "",
-      thirdChoiceProgramme: pc.thirdChoiceProgramme || "",
-      thirdChoiceStream: pc.thirdChoiceStream || "",
-      fourthChoiceProgramme: pc.fourthChoiceProgramme || "",
-      fourthChoiceStream: pc.fourthChoiceStream || "",
-    });
-    const ed = app.educationalBackground?.[0] || {};
-    setEducation({
-      institutionName: ed.institutionName || "",
-      programmePursued: ed.programmePursued || "",
-      startDate: ed.startDate || "",
-      endDate: ed.endDate || "",
-    });
-    const ex = app.examinationInfo || {};
-    setExam({
-      examType: ex.examType || "WASSCE",
-      sitting: ex.sitting || "",
-      examYear: ex.examYear || "",
-      indexNumber: ex.indexNumber || "",
-    });
-    setResults(
-      app.results && app.results.length > 0
-        ? app.results
-        : [{ subject: "", grade: "" }],
-    );
-    setDocuments((app.documents as Record<string, string>) || {});
-  }
 
   const persistSession = (next: Session) => {
     setSession(next);
@@ -288,7 +176,6 @@ function ApplicantPortalContent() {
           canEdit: data.canEdit !== false,
         };
         persistSession(next);
-        if (data.application) hydrateForm(data.application);
       })();
     } catch {
       // ignore
@@ -324,10 +211,7 @@ function ApplicantPortalContent() {
         canEdit: data.canEdit !== false,
       };
       persistSession(next);
-      if (data.application) {
-        hydrateForm(data.application);
-        setMessage(null);
-      } else {
+      if (!data.application) {
         setMessage("Voucher verified. You have not submitted an application yet.");
       }
     } catch (err) {
@@ -340,71 +224,7 @@ function ApplicantPortalContent() {
   const handleLogout = () => {
     window.localStorage.removeItem(SESSION_KEY);
     setSession(null);
-    setEditing(false);
     setMessage(null);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!session || busy) return;
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/apply/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          schoolId: session.schoolId,
-          voucherCode: session.voucherCode,
-          serialNumber: session.serialNumber,
-          personalInfo: personal,
-          guardianInfo: guardian,
-          programmeChoices: programmes,
-          educationalBackground: [education],
-          examinationInfo: exam,
-          results: results.filter((r) => r.subject && r.grade),
-          documents,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save");
-
-      // Refresh session from server
-      const refresh = await fetch("/api/apply/voucher/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          schoolId: session.schoolId,
-          voucherCode: session.voucherCode,
-          serialNumber: session.serialNumber,
-        }),
-      });
-      const refreshed = await refresh.json();
-      if (refresh.ok) {
-        const next: Session = {
-          ...session,
-          schoolName: refreshed.school?.name || session.schoolName,
-          schoolSlug: refreshed.school?.slug ?? session.schoolSlug,
-          brandColor: refreshed.school?.brandColor ?? session.brandColor,
-          application: refreshed.application,
-          canEdit: refreshed.canEdit !== false,
-        };
-        persistSession(next);
-        if (refreshed.application) hydrateForm(refreshed.application);
-      }
-
-      setEditing(false);
-      setMessage(
-        data.updated
-          ? "Application updated successfully."
-          : "Application submitted successfully.",
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setBusy(false);
-    }
   };
 
   const activeSchool =
@@ -435,7 +255,7 @@ function ApplicantPortalContent() {
       style={themeStyle}
     >
       <Header />
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 md:py-10">
+      <main className="mx-auto max-w-5xl px-4 pt-4 pb-10 sm:px-6 md:pt-5">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--school-brand,#007AFF)] text-white shadow-lg shadow-[var(--school-brand,#007AFF)]/20">
@@ -507,7 +327,7 @@ function ApplicantPortalContent() {
                   required
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
-                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2.5 font-mono outline-none focus:border-[var(--school-brand,#007AFF)]"
+                  className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 font-mono text-[#111827] caret-[#111827] outline-none placeholder:text-[#9CA3AF] focus:border-[var(--school-brand,#007AFF)]"
                   placeholder="TG-2026-001234"
                 />
               </label>
@@ -517,7 +337,7 @@ function ApplicantPortalContent() {
                   required
                   value={voucherCode}
                   onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2.5 font-mono outline-none focus:border-[var(--school-brand,#007AFF)]"
+                  className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 font-mono text-[#111827] caret-[#111827] outline-none placeholder:text-[#9CA3AF] focus:border-[var(--school-brand,#007AFF)]"
                   placeholder="HS-8K7D-29PX"
                 />
               </label>
@@ -529,15 +349,23 @@ function ApplicantPortalContent() {
                 {busy ? "Signing in…" : "Sign in"}
               </button>
             </form>
-            <p className="border-t border-[#F1F5F9] px-6 py-4 text-center text-xs text-[#9CA3AF]">
-              New applicant?{" "}
-              <Link href="/apply" className="text-[var(--school-brand,#007AFF)] underline">
-                Start application
-              </Link>
-              {" · "}
-              <Link href="/dashboard/my-forms" className="text-[var(--school-brand,#007AFF)] underline">
-                My Forms
-              </Link>
+            <p className="border-t border-[#F1F5F9] px-6 py-4 text-center text-sm text-[#6B7280]">
+              Don’t have a form yet?{" "}
+              {activeSchool ? (
+                <Link
+                  href={partnerSchoolBuyFormsHref(activeSchool)}
+                  className="font-semibold text-[var(--school-brand,#007AFF)] underline"
+                >
+                  Buy new forms
+                </Link>
+              ) : (
+                <Link
+                  href="/apply"
+                  className="font-semibold text-[var(--school-brand,#007AFF)] underline"
+                >
+                  Choose a school
+                </Link>
+              )}
             </p>
           </section>
         ) : (
@@ -612,11 +440,15 @@ function ApplicantPortalContent() {
                     {session.canEdit && (
                       <button
                         type="button"
-                        onClick={() => setEditing((v) => !v)}
+                        onClick={() =>
+                          router.push(
+                            `/apply?school=${session.schoolSlug || session.schoolId}&step=form&voucherCode=${encodeURIComponent(session.voucherCode)}&serialNumber=${encodeURIComponent(session.serialNumber)}`,
+                          )
+                        }
                         className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--school-brand,#007AFF)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)]"
                       >
                         <Pencil className="h-4 w-4" />
-                        {editing ? "Hide form" : "Edit application"}
+                        Edit application
                       </button>
                     )}
                     {!session.canEdit && (
@@ -650,116 +482,10 @@ function ApplicantPortalContent() {
                     >
                       Complete application form
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditing(true)}
-                      className="rounded-full border px-4 py-2 text-sm font-medium"
-                    >
-                      Fill form here
-                    </button>
                   </div>
                 </div>
               )}
             </section>
-
-            {editing && session.canEdit && (
-              <form
-                onSubmit={handleSave}
-                className="space-y-5 rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm"
-              >
-                <h3 className="text-base font-semibold">Edit application details</h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {(
-                    [
-                      ["surname", "Surname *"],
-                      ["firstName", "First name *"],
-                      ["middleName", "Middle name"],
-                      ["phoneNumber", "Phone *"],
-                      ["email", "Email *"],
-                      ["gender", "Gender"],
-                      ["dateOfBirth", "Date of birth"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <label key={key} className="space-y-1 text-sm">
-                      <span className="font-medium">{label}</span>
-                      <input
-                        required={label.includes("*")}
-                        type={key === "dateOfBirth" ? "date" : key === "email" ? "email" : "text"}
-                        value={personal[key]}
-                        onChange={(e) =>
-                          setPersonal((p) => ({ ...p, [key]: e.target.value }))
-                        }
-                        className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 outline-none focus:border-[var(--school-brand,#007AFF)]"
-                      />
-                    </label>
-                  ))}
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {(
-                    [
-                      ["firstChoice", "1st choice"],
-                      ["secondChoice", "2nd choice"],
-                      ["thirdChoice", "3rd choice"],
-                      ["fourthChoice", "4th choice"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <label key={key} className="space-y-1 text-sm">
-                      <span className="font-medium">{label}</span>
-                      <input
-                        value={programmes[key]}
-                        onChange={(e) =>
-                          setProgrammes((p) => ({ ...p, [key]: e.target.value }))
-                        }
-                        className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 outline-none focus:border-[var(--school-brand,#007AFF)]"
-                      />
-                    </label>
-                  ))}
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Results</p>
-                  {results.map((row, index) => (
-                    <div key={index} className="grid grid-cols-2 gap-2">
-                      <input
-                        placeholder="Subject"
-                        value={row.subject}
-                        onChange={(e) => {
-                          const next = [...results];
-                          next[index] = { ...row, subject: e.target.value };
-                          setResults(next);
-                        }}
-                        className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm"
-                      />
-                      <input
-                        placeholder="Grade"
-                        value={row.grade}
-                        onChange={(e) => {
-                          const next = [...results];
-                          next[index] = { ...row, grade: e.target.value };
-                          setResults(next);
-                        }}
-                        className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm"
-                      />
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setResults((r) => [...r, { subject: "", grade: "" }])
-                    }
-                    className="text-sm text-[var(--school-brand,#007AFF)]"
-                  >
-                    + Add subject
-                  </button>
-                </div>
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="w-full rounded-full bg-[var(--school-brand,#007AFF)] px-5 py-3 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)] disabled:opacity-60"
-                >
-                  {busy ? "Saving…" : session.application ? "Save changes" : "Submit application"}
-                </button>
-              </form>
-            )}
           </div>
         )}
       </main>

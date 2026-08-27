@@ -402,10 +402,10 @@ export default function MyCheckersDashboardPage() {
                           {purchase.vouchers.map((v, i) => (
                             <li
                               key={`${v.serial}-${i}`}
-                              className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                              className="rounded-2xl border border-[#E5E7EB] bg-white p-3"
                             >
                               <div className="mb-2 flex items-center justify-between">
-                                <span className="text-[9px] font-bold uppercase text-white/40">Serial</span>
+                                <span className="text-[9px] font-bold uppercase text-[#6B7280]">Serial</span>
                                 <button
                                   type="button"
                                   onClick={(e) =>
@@ -415,19 +415,19 @@ export default function MyCheckersDashboardPage() {
                                       `${purchase.id}-${i}-serial`,
                                     )
                                   }
-                                  className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[9px] font-bold text-white/80 transition hover:bg-white/10"
+                                  className="flex items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[9px] font-bold text-[#374151] transition hover:bg-[#E5E7EB]"
                                 >
                                   Copy
                                   <Copy
-                                    className={`h-2.5 w-2.5 ${copyingId === `${purchase.id}-${i}-serial` ? "text-[#4ADE80]" : ""}`}
+                                    className={`h-2.5 w-2.5 ${copyingId === `${purchase.id}-${i}-serial` ? "text-[#16A34A]" : ""}`}
                                   />
                                 </button>
                               </div>
-                              <p className="font-mono text-sm font-bold tracking-tight text-white break-all">
+                              <p className="font-mono text-sm font-bold tracking-tight text-[#111827] break-all">
                                 {v.serial}
                               </p>
-                              <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-2">
-                                <span className="text-[9px] font-bold uppercase text-white/40">PIN</span>
+                              <div className="mt-2 flex items-center justify-between border-t border-[#E5E7EB] pt-2">
+                                <span className="text-[9px] font-bold uppercase text-[#6B7280]">PIN</span>
                                 <button
                                   type="button"
                                   onClick={(e) =>
@@ -437,15 +437,15 @@ export default function MyCheckersDashboardPage() {
                                       `${purchase.id}-${i}-pin`,
                                     )
                                   }
-                                  className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[9px] font-bold text-white/80 transition hover:bg-white/10"
+                                  className="flex items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[9px] font-bold text-[#374151] transition hover:bg-[#E5E7EB]"
                                 >
                                   Copy
                                   <Copy
-                                    className={`h-2.5 w-2.5 ${copyingId === `${purchase.id}-${i}-pin` ? "text-[#4ADE80]" : ""}`}
+                                    className={`h-2.5 w-2.5 ${copyingId === `${purchase.id}-${i}-pin` ? "text-[#16A34A]" : ""}`}
                                   />
                                 </button>
                               </div>
-                              <p className="mt-0.5 font-mono text-sm font-bold tracking-widest text-white">
+                              <p className="mt-0.5 font-mono text-sm font-bold tracking-widest text-[#111827]">
                                 {v.pin}
                               </p>
                             </li>

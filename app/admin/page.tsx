@@ -13,6 +13,7 @@ import {
   GraduationCap,
   HelpCircle,
   LayoutDashboard,
+  LineChart,
   LogOut,
   Mail,
   Megaphone,
@@ -31,6 +32,7 @@ import { AdminUsersSection } from "./AdminUsersSection";
 import { AdminCheckersSection } from "./AdminCheckersSection";
 import { AdminAssistanceSection } from "./AdminAssistanceSection";
 import { AdminAdsSection } from "./AdminAdsSection";
+import { AdminAdReportsSection } from "./AdminAdReportsSection";
 import { AdminFormRequestsSection } from "./AdminFormRequestsSection";
 import { AdminSettingsSection } from "./AdminSettingsSection";
 import { AdminStaffSection } from "./AdminStaffSection";
@@ -58,6 +60,7 @@ type AdminSection =
   | "blog"
   | "explore"
   | "ads"
+  | "adReports"
   | "emailCampaigns"
   | "settings"
   | "staff";
@@ -615,6 +618,7 @@ export default function AdminDashboardPage() {
     { id: "blog", label: "Blog", icon: Newspaper },
     { id: "explore", label: "Explore", icon: Compass },
     { id: "ads", label: "Ads", icon: Megaphone },
+    { id: "adReports", label: "Ad reports", icon: LineChart },
     { id: "emailCampaigns", label: "Email campaigns", icon: Mail },
     { id: "analytics", label: "Analytics", icon: BarChart3 },
     { id: "settings", label: "Settings", icon: Settings },
@@ -622,7 +626,7 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#F3F4F6] px-4 py-4 text-[#050816] sm:px-6 sm:py-6 md:px-10 md:py-8">
+    <main className="min-h-screen bg-[#F3F4F6] px-4 py-4 text-[#050816] sm:px-6 md:px-10">
       <div className="mx-auto flex min-w-0 max-w-7xl flex-col gap-6 sm:gap-8">
         <header className="overflow-hidden rounded-3xl border border-[#BFDBFE] bg-gradient-to-r from-[#EAF4FF] via-white to-[#F2F8FF] px-4 py-4 shadow-sm sm:px-6">
           <div className="flex items-center justify-between gap-2">
@@ -947,6 +951,8 @@ export default function AdminDashboardPage() {
           <AdminExploreSection />
         ) : activeSection === "ads" ? (
           <AdminAdsSection />
+        ) : activeSection === "adReports" ? (
+          <AdminAdReportsSection />
         ) : activeSection === "emailCampaigns" ? (
           <AdminEmailCampaignsSection />
         ) : activeSection === "settings" ? (

@@ -3,6 +3,7 @@ import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import type { AdDoc } from "@/lib/ads";
 import { serializeAdDoc } from "@/lib/ads";
+import { parseOptionalEmail, parseOptionalText } from "@/lib/ad-analytics";
 import { resolveStoredAdImageUrl } from "@/lib/adVideo";
 
 export async function GET(
@@ -84,6 +85,15 @@ export async function PUT(
       $set.targetUrl = t == null || t === "" ? null : String(t);
     }
     if (typeof body.ctaText === "string") $set.ctaText = body.ctaText;
+    if ("advertiserName" in body) {
+      $set.advertiserName = parseOptionalText(body.advertiserName);
+    }
+    if ("advertiserEmail" in body) {
+      $set.advertiserEmail = parseOptionalEmail(body.advertiserEmail);
+    }
+    if ("campaignName" in body) {
+      $set.campaignName = parseOptionalText(body.campaignName);
+    }
     if (typeof body.isActive === "boolean") $set.isActive = body.isActive;
     if (body.startDate != null) {
       const d = new Date(String(body.startDate));

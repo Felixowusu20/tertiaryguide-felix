@@ -1,11 +1,12 @@
 import { getDb } from "../../lib/mongodb";
 import Link from "next/link";
-import Image from "next/image";
 import type { Metadata } from "next";
 import { Header } from "@/app/components/Header";
 import { Footer } from "@/app/components/Footer";
 import { BlogAdLabel } from "@/app/components/BlogAdLabel";
 import { BlogAdSnippets } from "@/app/components/BlogAdSnippets";
+import { BlogPostImage } from "@/app/components/BlogPostImage";
+import { BlogPagination, BLOG_PAGE_SIZE } from "@/app/components/BlogPagination";
 import { getPublicActiveAds } from "@/lib/ads";
 import { publicBlogPostFilter } from "@/lib/blog-visibility";
 import { Search } from "lucide-react";
@@ -25,7 +26,20 @@ interface BlogPostDoc {
   schoolId?: string | null;
 }
 
-async function fetchPosts(query?: string, schoolId?: string) {
+function mapPost(doc: BlogPostDoc) {
+  return {
+    id: String(doc._id),
+    title: doc.title,
+    slug: doc.slug,
+    featuredImageUrl: doc.featuredImageUrl ?? null,
+    date: (doc.publishedAt ?? doc.createdAt).toISOString(),
+    excerpt:
+      doc.contentHtml.replace(/<[^>]+>/g, " ").slice(0, 150) + "...",
+    isAd: doc.isAd === true,
+  };
+}
+
+async function fetchPosts(query?: string, schoolId?: string, page = 1) {
   const db = await getDb();
   const postsCollect = db.collection<BlogPostDoc>("blogPosts");
 
@@ -50,21 +64,27 @@ async function fetchPosts(query?: string, schoolId?: string) {
     filter = await publicBlogPostFilter(db, filter);
   }
 
-  const docs = await postsCollect
-    .find(filter)
-    .sort({ publishedAt: -1 })
-    .toArray();
+  const total = await postsCollect.countDocuments(filter);
+  const totalPages = Math.max(1, Math.ceil(total / BLOG_PAGE_SIZE));
+  const safePage = Math.min(Math.max(page, 1), totalPages);
 
-  return docs.map((doc) => ({
-    id: String(doc._id),
-    title: doc.title,
-    slug: doc.slug,
-    featuredImageUrl: doc.featuredImageUrl ?? null,
-    date: (doc.publishedAt ?? doc.createdAt).toISOString(),
-    excerpt:
-      doc.contentHtml.replace(/<[^>]+>/g, " ").slice(0, 150) + "...",
-    isAd: doc.isAd === true,
-  }));
+  const [docs, recentDocs] = await Promise.all([
+    postsCollect
+      .find(filter)
+      .sort({ publishedAt: -1 })
+      .skip((safePage - 1) * BLOG_PAGE_SIZE)
+      .limit(BLOG_PAGE_SIZE)
+      .toArray(),
+    postsCollect.find(filter).sort({ publishedAt: -1 }).limit(5).toArray(),
+  ]);
+
+  return {
+    posts: docs.map(mapPost),
+    recentPosts: recentDocs.map(mapPost),
+    total,
+    page: safePage,
+    totalPages,
+  };
 }
 
 function formatDate(raw: string): string {
@@ -84,14 +104,17 @@ const blogIndexDescription =
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; schoolId?: string }>;
+  searchParams: Promise<{ q?: string; schoolId?: string; page?: string }>;
 }): Promise<Metadata> {
-  const { q, schoolId } = await searchParams;
+  const { q, schoolId, page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
   const title = q
     ? `Search: “${q}”`
     : schoolId
       ? "University blog"
-      : "Blog";
+      : page > 1
+        ? `Blog · Page ${page}`
+        : "Blog";
   const description = q
     ? `Search results for “${q}” on the TertiaryGuide blog. ${blogIndexDescription}`
     : blogIndexDescription;
@@ -103,7 +126,7 @@ export async function generateMetadata({
       q || schoolId
         ? {}
         : {
-            canonical: "/blog",
+            canonical: page > 1 ? `/blog?page=${page}` : "/blog",
           },
     openGraph: {
       title: `${title} | TertiaryGuide`,
@@ -133,32 +156,33 @@ export async function generateMetadata({
 export default async function BlogListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; schoolId?: string }>;
+  searchParams: Promise<{ q?: string; schoolId?: string; page?: string }>;
 }) {
-  const { q, schoolId } = await searchParams;
-  const [posts, promoAds] = await Promise.all([
-    fetchPosts(q, schoolId),
-    getPublicActiveAds(),
-  ]);
-  const recentPosts = posts.slice(0, 5);
+  const { q, schoolId, page: pageParam } = await searchParams;
+  const requestedPage = Math.max(1, Number(pageParam) || 1);
+  const [{ posts, recentPosts, total, page, totalPages }, promoAds] =
+    await Promise.all([
+      fetchPosts(q, schoolId, requestedPage),
+      getPublicActiveAds(),
+    ]);
   return (
     <>
       <section className="min-h-screen bg-white text-[#111827]">
   
         {/* NAVBAR */}
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-4 md:gap-8 md:px-10 md:py-8">
+        <div className="mx-auto flex max-w-6xl flex-col px-4 sm:px-6 md:px-10">
           <Header />
         </div>
   
         {/* MAIN */}
-        <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 pt-4 pb-10 md:px-6 md:pt-5 lg:px-8">
           <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_350px]">
   
             {/* ================= MAIN ================= */}
             <main className="min-w-0 space-y-12">
   
               {/* TITLE */}
-              <div className="mb-8">
+              <div>
                 <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">
                   {q
                     ? `Search results for "${q}"`
@@ -169,7 +193,7 @@ export default async function BlogListPage({
   
                 {(q || schoolId) && (
                   <p className="mt-2 text-gray-500">
-                    {posts.length} results found
+                    {total} result{total === 1 ? "" : "s"} found
                   </p>
                 )}
               </div>
@@ -177,36 +201,33 @@ export default async function BlogListPage({
               {/* POSTS */}
               <div className="flex flex-col gap-6">
                 {posts.length > 0 ? (
-                  posts.map((post) => (
+                  posts.map((post, index) => (
                     <article
                       key={post.slug}
-                      className="group overflow-hidden rounded-3xl border border-[#E8EEF5] bg-white p-5 shadow-[0_8px_28px_rgba(15,23,42,0.05)] sm:p-6"
+                      className="group overflow-hidden rounded-3xl border border-[#E8EEF5] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.05)]"
                     >
   
                       {/* IMAGE */}
                       {post.featuredImageUrl ? (
                         <Link
                           href={`/blog/${post.slug}`}
-                          className="mb-6 block overflow-hidden rounded-2xl bg-[#F3F4F6] shadow-sm ring-1 ring-gray-900/10"
+                          className="block w-full overflow-hidden bg-[#F3F4F6]"
                         >
-                          <div className="relative aspect-[16/9] w-full">
-                            <Image
-                              src={post.featuredImageUrl}
-                              alt={post.title}
-                              fill
-                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 70vw, 800px"
-                              className="object-cover transition duration-300 group-hover:opacity-95"
-                            />
-                          </div>
+                          <BlogPostImage
+                            src={post.featuredImageUrl}
+                            alt={post.title}
+                            variant="list"
+                            priority={index === 0}
+                          />
                         </Link>
                       ) : (
-                        <div className="mb-6 flex h-48 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
+                        <div className="flex h-48 w-full items-center justify-center bg-gray-100 text-gray-400">
                           No Image Available
                         </div>
                       )}
   
                       {/* CONTENT */}
-                      <div className="space-y-4">
+                      <div className="space-y-4 p-5 sm:p-6">
                         <Link href={`/blog/${post.slug}`}>
                           <h2 className="flex flex-wrap items-center gap-2 text-2xl font-bold leading-tight tracking-tight hover:text-[#007AFF] sm:text-3xl sm:gap-2.5">
                             {post.isAd && <BlogAdLabel className="align-middle" />}
@@ -246,6 +267,14 @@ export default async function BlogListPage({
                     </Link>
                   </div>
                 )}
+
+                <BlogPagination
+                  page={page}
+                  totalPages={totalPages}
+                  total={total}
+                  q={q}
+                  schoolId={schoolId}
+                />
               </div>
   
             </main>
@@ -255,6 +284,9 @@ export default async function BlogListPage({
   
               {/* SEARCH */}
               <form action="/blog" method="GET" className="relative">
+                {schoolId ? (
+                  <input type="hidden" name="schoolId" value={schoolId} />
+                ) : null}
                 <input
                   type="text"
                   name="q"
@@ -284,17 +316,15 @@ export default async function BlogListPage({
                       href={`/blog/${rp.slug}`}
                       className="group flex gap-4"
                     >
-                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-lg bg-[#F3F4F6] ring-1 ring-gray-900/5">
+                      <div className="shrink-0">
                         {rp.featuredImageUrl ? (
-                          <Image
+                          <BlogPostImage
                             src={rp.featuredImageUrl}
                             alt={rp.title}
-                            fill
-                            className="object-contain p-0.5 transition group-hover:opacity-90"
-                            sizes="96px"
+                            variant="thumb"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-gray-400">
+                          <div className="flex h-20 w-24 items-center justify-center rounded-lg bg-[#F3F4F6] text-gray-400 ring-1 ring-gray-900/5">
                             📝
                           </div>
                         )}

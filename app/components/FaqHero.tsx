@@ -28,7 +28,7 @@ export function FaqHero({
   setActiveCategory: (val: string) => void;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-2xl bg-[#007AFF] px-4 py-10 text-white shadow-sm min-[400px]:rounded-3xl min-[400px]:px-5 min-[500px]:px-6 min-[500px]:py-12 sm:px-6 sm:py-14 md:rounded-[40px] md:px-10 md:py-20 lg:px-16 lg:py-24">
+    <section className="relative overflow-hidden rounded-2xl bg-[#007AFF] px-4 py-8 text-white shadow-sm min-[400px]:rounded-3xl min-[400px]:px-5 min-[500px]:px-6 min-[500px]:py-10 sm:px-6 sm:py-12 md:rounded-[40px] md:px-10 md:py-14 lg:px-16 lg:py-16">
       {/* Decorative patterns — smaller on very narrow viewports */}
       <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10 blur-3xl min-[400px]:-right-20 min-[400px]:-top-20 min-[400px]:h-64 min-[400px]:w-64" />
       <div className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-white/10 blur-3xl min-[400px]:-bottom-20 min-[400px]:-left-20 min-[400px]:h-64 min-[400px]:w-64" />

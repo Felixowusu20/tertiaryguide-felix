@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Search, Clock } from "lucide-react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
+import { programmeCompareHref } from "@/lib/school-links";
 
 type ProgrammeSearchResult = {
   id: string;
@@ -106,7 +107,7 @@ function ProgramSearchContent() {
   }, [trimmedQuery, showResults]);
 
   return (
-    <main className="mt-10 space-y-8 md:mt-16">
+    <main className="space-y-8">
       <section className="space-y-6">
         <h1 className="text-3xl font-semibold leading-tight md:text-4xl">
           Program Search &amp; Compare
@@ -137,14 +138,7 @@ function ProgramSearchContent() {
                 </p>
               ) : (
                 results.map((item) => {
-                  const href =
-                    item.source === "partner" && item.school?.slug
-                      ? `/apply/school/${encodeURIComponent(item.school.slug)}`
-                      : item.school?.isPartner && item.school?.slug
-                        ? `/apply/school/${encodeURIComponent(item.school.slug)}`
-                        : `/program-search/compare?programmeId=${encodeURIComponent(item.id)}${
-                            item.source === "partner" ? "&source=partner" : ""
-                          }`;
+                  const href = programmeCompareHref(item);
 
                   return (
                   <Link
@@ -204,7 +198,7 @@ function ProgramSearchContent() {
 export default function ProgramSearchPage() {
   return (
     <div className="min-h-screen bg-white text-[#1E1E1E]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-4 md:px-10 md:py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-8 sm:px-6 md:gap-5 md:px-10 md:pb-10">
         <Header />
 
         <Suspense fallback={null}>

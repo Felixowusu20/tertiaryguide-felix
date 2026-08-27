@@ -5,12 +5,14 @@ import { Download, ExternalLink, FileText } from "lucide-react";
 const LABELS: Record<string, string> = {
   passportPhoto: "Passport photograph",
   resultSlip: "Result slip",
+  nationalId: "Ghana Card / National ID",
   birthCertificate: "Birth certificate",
 };
 
 const KNUST_DOC_ORDER = [
   "passportPhoto",
   "resultSlip",
+  "nationalId",
   "birthCertificate",
 ] as const;
 
@@ -21,6 +23,9 @@ const KNUST_DOC_ALIASES: Record<string, (typeof KNUST_DOC_ORDER)[number]> = {
   resultSlip: "resultSlip",
   wassceResultSlip: "resultSlip",
   sssceResultSlip: "resultSlip",
+  nationalId: "nationalId",
+  ghanaCard: "nationalId",
+  idCard: "nationalId",
   birthCertificate: "birthCertificate",
   birthCert: "birthCertificate",
 };

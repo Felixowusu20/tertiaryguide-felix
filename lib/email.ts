@@ -694,6 +694,8 @@ export async function sendApplicationSubmittedToSchool(opts: {
   schoolName: string;
   applicationNumber: string;
   applicationUrl: string;
+  updated?: boolean;
+  pdf?: { filename: string; content: Buffer };
 }): Promise<void> {
   const {
     to,
@@ -702,34 +704,70 @@ export async function sendApplicationSubmittedToSchool(opts: {
     schoolName,
     applicationNumber,
     applicationUrl,
+    updated = false,
+    pdf,
   } = opts;
+
+  const heading = updated
+    ? `An application was updated for ${schoolName}. Please open your dashboard to review the latest details.`
+    : `You have received a new applicant at ${schoolName}. Please open your dashboard now to review this student.`;
+  const subject = updated
+    ? `Updated applicant — review ${applicantName} on your ${schoolName} dashboard`
+    : `New applicant — review ${applicantName} on your ${schoolName} dashboard`;
+  const pdfNote = pdf
+    ? "The official application summary PDF is attached. Download it to review the full printout, then open your dashboard to change the student’s status."
+    : "Open your dashboard to review this student.";
 
   const result = await resend.emails.send({
     from: FROM_EMAIL,
     to,
-    subject: `New application — ${applicantName} (${schoolName})`,
+    subject,
     text: [
-      `A new application was submitted for ${schoolName}.`,
+      "Hello,",
+      "",
+      heading,
       "",
       `Applicant: ${applicantName}`,
       `Programme: ${programme || "Not specified"}`,
       `Application Number: ${applicationNumber}`,
       "",
-      `Review: ${applicationUrl}`,
+      pdfNote,
+      `Review on dashboard: ${applicationUrl}`,
       "",
       "TertiaryGuide Admissions",
-    ].join("\n"),
+    ]
+      .filter((line, index, lines) => line !== "" || lines[index - 1] !== "")
+      .join("\n"),
     html: `
-      <div style="font-family: system-ui, sans-serif; color: #111827; padding: 24px;">
-        <p>A new application was submitted for <strong>${escapeHtml(schoolName)}</strong>.</p>
+      <div style="font-family: system-ui, sans-serif; color: #111827; padding: 24px; max-width: 560px;">
+        <p>Hello,</p>
+        <p>${escapeHtml(heading)}</p>
         <ul>
           <li><strong>Applicant:</strong> ${escapeHtml(applicantName)}</li>
           <li><strong>Programme:</strong> ${escapeHtml(programme || "Not specified")}</li>
           <li><strong>Application Number:</strong> ${escapeHtml(applicationNumber)}</li>
         </ul>
-        <p><a href="${escapeHtml(applicationUrl)}" style="color:#007AFF;">Open application</a></p>
+        ${
+          pdf
+            ? `<p>The official application summary PDF is attached. Download it to review the printout (including the passport photograph and programme choices), then use your dashboard to approve, reject, or admit the student.</p>`
+            : `<p>Open your dashboard to review this student and update their status.</p>`
+        }
+        <p style="margin: 24px 0;">
+          <a href="${escapeHtml(applicationUrl)}" style="display:inline-block;background:#007AFF;color:#ffffff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:600;">
+            Open dashboard to review
+          </a>
+        </p>
       </div>
     `,
+    attachments: pdf
+      ? [
+          {
+            filename: pdf.filename,
+            content: pdf.content.toString("base64"),
+            contentType: "application/pdf",
+          },
+        ]
+      : undefined,
   });
 
   if (result.error) {
@@ -1133,6 +1171,79 @@ export async function sendSchoolPortalInviteEmail(opts: {
     );
   }
 }
+
+export async function sendAdvertiserPerformanceEmail(opts: {
+  to: string;
+  advertiserName?: string;
+  fromLabel: string;
+  toLabel: string;
+  summaryHtml: string;
+  xlsxBuffer: Buffer;
+  filename: string;
+}): Promise<void> {
+  const { to, advertiserName, fromLabel, toLabel, summaryHtml, xlsxBuffer, filename } =
+    opts;
+  const greeting = advertiserName?.trim() || "there";
+  const subject = `Your TertiaryGuide advertising report (${fromLabel} – ${toLabel})`;
+  const text = [
+    `Hello ${greeting},`,
+    "",
+    `Please find attached your advertising performance report for ${fromLabel} to ${toLabel}.`,
+    "",
+    "This report covers impressions, views, clicks, and click-through rate for your ads and Explore posts on TertiaryGuide. It does not include personal information about people who saw the ads.",
+    "",
+    "Warm regards,",
+    "The TertiaryGuide Team",
+  ].join("\n");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:24px;background:#F8FAFC;font-family:system-ui,sans-serif;color:#0F172A;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #E2E8F0;">
+    <tr>
+      <td style="padding:24px 28px;background:#007AFF;color:#fff;">
+        <p style="margin:0;font-size:18px;font-weight:700;">TertiaryGuide</p>
+        <p style="margin:6px 0 0;font-size:13px;opacity:.9;">Advertising performance report</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px 28px;">
+        <p style="margin:0 0 12px;font-size:15px;">Hello ${escapeHtml(greeting)},</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#334155;">
+          Attached is your campaign report for <strong>${escapeHtml(fromLabel)}</strong>
+          to <strong>${escapeHtml(toLabel)}</strong>. Metrics are aggregated and do not
+          include personal data about site visitors.
+        </p>
+        ${summaryHtml}
+        <p style="margin:20px 0 0;font-size:13px;color:#64748B;">
+          Warm regards,<br />The TertiaryGuide Team
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const result = await resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject,
+    text,
+    html,
+    attachments: [
+      {
+        filename,
+        content: xlsxBuffer,
+      },
+    ],
+  });
+
+  if (result.error) {
+    throw new Error(result.error.message || "Failed to send advertiser report");
+  }
+}
+
 
 
 

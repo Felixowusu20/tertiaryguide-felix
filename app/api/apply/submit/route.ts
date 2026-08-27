@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 import { getDb } from "../../../../lib/mongodb";
 import { findSchoolById } from "../../../../lib/admissions/schools";
-import type { ApplicationDoc } from "../../../../lib/admissions/types";
+import type { ApplicationDoc, SchoolDoc } from "../../../../lib/admissions/types";
 import {
   applicationsCollection,
   ensureApplicationIndexes,
@@ -10,6 +10,8 @@ import {
   parseDocuments,
   parseEducationalBackground,
   parseExaminationInfo,
+  parseAdditionalExaminations,
+  parseExaminationSittings,
   parseGuardianInfo,
   parsePersonalInfo,
   parseProgrammeChoices,
@@ -17,15 +19,91 @@ import {
   serializeApplication,
 } from "../../../../lib/admissions/applications";
 import {
+  deadlineToIso,
   isApplicationEditable,
   loginWithVoucher,
   markVoucherUsed,
 } from "../../../../lib/admissions/vouchers";
+import { isDeadlineCalendarExpired } from "../../../../lib/deadlines";
 import {
   sendApplicationSubmittedToApplicant,
   sendApplicationSubmittedToSchool,
 } from "../../../../lib/email";
 import { verifyPassword } from "../../../../lib/password";
+import {
+  buildApplicationSummaryPdf,
+  printoutFilename,
+} from "../../../../lib/admissions/application-pdf";
+import { printoutFromDetail } from "../../../../lib/admissions/printout-data";
+import { schoolApplicationNotifyEmails } from "../../../../lib/admissions/school-notify-emails";
+import { listProgrammeChoices } from "../../../../lib/admissions/programme-choices";
+
+async function notifySchoolOfApplication(opts: {
+  db: Db;
+  school: SchoolDoc;
+  application: ApplicationDoc;
+  applicantName: string;
+  updated: boolean;
+}) {
+  const emails = await schoolApplicationNotifyEmails(opts.db, opts.school);
+  if (emails.length === 0) {
+    console.warn(
+      "[apply/submit] no school admin emails for",
+      opts.school.slug || opts.school.name,
+    );
+    return;
+  }
+
+  const detail = serializeApplication(opts.application);
+  const programmes = detail.programmes?.length
+    ? detail.programmes
+    : listProgrammeChoices(detail.programmeChoices, detail.programme);
+  const programme =
+    programmes[0]?.display ||
+    opts.application.programmeChoices?.firstChoice ||
+    null;
+  const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+  const applicationUrl = `${base}/admin/${opts.school.slug}?tab=applicants&id=${String(opts.application._id)}`;
+
+  let pdf: { filename: string; content: Buffer } | undefined;
+  try {
+    const content = await buildApplicationSummaryPdf({
+      school: {
+        name: opts.school.name,
+        logoSrc: opts.school.logoSrc,
+        brandColor: opts.school.brandColor,
+        brandColors: opts.school.brandColors,
+        phone: opts.school.phone,
+        email: opts.school.email,
+        address: opts.school.address,
+      },
+      data: printoutFromDetail(detail, programmes),
+    });
+    pdf = {
+      filename: printoutFilename(opts.application.applicationNumber),
+      content,
+    };
+  } catch (error) {
+    console.error("[apply/submit] school pdf", error);
+  }
+
+  for (const to of emails) {
+    try {
+      await sendApplicationSubmittedToSchool({
+        to,
+        applicantName: opts.applicantName,
+        programme,
+        schoolName: opts.school.name,
+        applicationNumber: opts.application.applicationNumber,
+        applicationUrl,
+        updated: opts.updated,
+        pdf,
+      });
+    } catch (error) {
+      console.error("[apply/submit] school email", to, error);
+    }
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,6 +134,16 @@ export async function POST(req: NextRequest) {
     const school = await findSchoolById(db, schoolId);
     if (!school || !school.isPartner || school.isActive === false) {
       return NextResponse.json({ error: "School not available" }, { status: 404 });
+    }
+
+    if (isDeadlineCalendarExpired(deadlineToIso(school.deadline))) {
+      return NextResponse.json(
+        {
+          error:
+            "The application deadline for this school has passed. You can still view and download your application, but it can no longer be edited.",
+        },
+        { status: 400 },
+      );
     }
 
     let voucherId: ObjectId | null = null;
@@ -113,11 +201,19 @@ export async function POST(req: NextRequest) {
       programmeChoices: parseProgrammeChoices(body?.programmeChoices),
       educationalBackground: parseEducationalBackground(body?.educationalBackground),
       examinationInfo: parseExaminationInfo(body?.examinationInfo),
+      additionalExaminations: parseAdditionalExaminations(
+        body?.additionalExaminations,
+      ),
+      examinationSittings: parseExaminationSittings(body?.examinationSittings),
       results: parseResults(body?.results),
       documents: parseDocuments(body?.documents),
       applicantEmail: personalInfo.email,
       updatedAt: new Date(),
     };
+
+    const applicantName = [personalInfo.firstName, personalInfo.surname]
+      .filter(Boolean)
+      .join(" ");
 
     if (existingApp?._id) {
       if (!isApplicationEditable(existingApp.status)) {
@@ -135,6 +231,20 @@ export async function POST(req: NextRequest) {
       );
 
       const updated = await applicationsCollection(db).findOne({ _id: existingApp._id });
+
+      if (updated) {
+        try {
+          await notifySchoolOfApplication({
+            db,
+            school,
+            application: updated,
+            applicantName,
+            updated: true,
+          });
+        } catch (e) {
+          console.error("[apply/submit] school notify", e);
+        }
+      }
 
       return NextResponse.json({
         ok: true,
@@ -190,10 +300,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const applicantName = [personalInfo.firstName, personalInfo.surname]
-      .filter(Boolean)
-      .join(" ");
-
     try {
       await sendApplicationSubmittedToApplicant({
         to: personalInfo.email,
@@ -206,21 +312,16 @@ export async function POST(req: NextRequest) {
       console.error("[apply/submit] applicant email", e);
     }
 
-    if (school.email) {
-      const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-      const applicationUrl = `${base}/admin/${school.slug}?tab=applicants&id=${result.insertedId}`;
-      try {
-        await sendApplicationSubmittedToSchool({
-          to: school.email,
-          applicantName,
-          programme: doc.programmeChoices?.firstChoice,
-          schoolName: school.name,
-          applicationNumber,
-          applicationUrl,
-        });
-      } catch (e) {
-        console.error("[apply/submit] school email", e);
-      }
+    try {
+      await notifySchoolOfApplication({
+        db,
+        school,
+        application: { ...doc, _id: result.insertedId },
+        applicantName,
+        updated: false,
+      });
+    } catch (e) {
+      console.error("[apply/submit] school notify", e);
     }
 
     return NextResponse.json(

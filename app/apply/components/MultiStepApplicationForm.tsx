@@ -5,8 +5,11 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Download,
   Loader2,
+  Plus,
   Save,
+  Trash2,
 } from "lucide-react";
 import {
   APPLICATION_TABS,
@@ -36,9 +39,21 @@ import {
 import {
   dobToIso,
   emptyApplicationForm,
+  emptyEducation,
+  emptyExamSitting,
+  examSittingLabel,
   fieldErrorsFromZod,
+  flattenExamResults,
+  formStateFromApplication,
+  MAX_EXAM_SITTINGS,
+  MAX_INSTITUTIONS,
+  normalizeApplicationForm,
   tabSchemas,
+  validateExamResults,
   type ApplicationFormState,
+  type EducationalBackgroundForm,
+  type ExaminationInfoForm,
+  type ExaminationSittingForm,
 } from "@/lib/admissions/form-schema";
 import {
   readApplySession,
@@ -46,6 +61,11 @@ import {
 } from "@/lib/admissions/applicant-session";
 import { Field, SearchableSelect, TextInput, TextSelect } from "./FormControls";
 import { FileDropzone } from "./FileDropzone";
+import {
+  ApplicationPrintout,
+  downloadApplicationPrintout,
+  printoutFromForm,
+} from "@/app/components/ApplicationPrintout";
 
 type ProgrammeOption = {
   id: string;
@@ -57,6 +77,12 @@ type Props = {
   schoolId: string;
   schoolName: string;
   schoolSlug?: string | null;
+  schoolLogo?: string | null;
+  brandColor?: string | null;
+  brandColors?: string[] | null;
+  schoolPhone?: string | null;
+  schoolEmail?: string | null;
+  schoolAddress?: string | null;
   voucherCode?: string;
   serialNumber?: string;
   loginEmail?: string;
@@ -66,6 +92,7 @@ type Props = {
     applicationNumber: string;
     schoolName: string;
     updated?: boolean;
+    printout: ReturnType<typeof printoutFromForm>;
   }) => void;
 };
 
@@ -79,10 +106,232 @@ function localDraftKey(schoolId: string, voucherCode?: string, serialNumber?: st
   return `${LOCAL_DRAFT_PREFIX}${id}`;
 }
 
+function sittingLabel(sitting: string) {
+  return sitting === "Nov/Dec" ? "Nov/Dec (NOVDEC)" : sitting;
+}
+
+function ExaminationSittingFields({
+  exam,
+  errorPrefix,
+  errors,
+  onChange,
+}: {
+  exam: ExaminationInfoForm;
+  errorPrefix: string;
+  errors: Record<string, string>;
+  onChange: (
+    key: keyof ExaminationInfoForm,
+    value: ExaminationInfoForm[keyof ExaminationInfoForm],
+  ) => void;
+}) {
+  const err = (key: string) => errors[`${errorPrefix}.${key}`];
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Examination type" required error={err("examType")}>
+        <TextSelect
+          value={exam.examType}
+          onChange={(e) =>
+            onChange("examType", e.target.value as ExaminationInfoForm["examType"])
+          }
+        >
+          {EXAM_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </TextSelect>
+      </Field>
+      <Field label="Examination body" required error={err("examBody")}>
+        <TextSelect
+          value={exam.examBody}
+          onChange={(e) =>
+            onChange("examBody", e.target.value as ExaminationInfoForm["examBody"])
+          }
+        >
+          {EXAM_BODIES.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </TextSelect>
+      </Field>
+      <Field label="Sitting type" required error={err("sitting")}>
+        <TextSelect
+          value={exam.sitting}
+          onChange={(e) =>
+            onChange("sitting", e.target.value as ExaminationInfoForm["sitting"])
+          }
+        >
+          {SITTING_TYPES.map((s) => (
+            <option key={s} value={s}>
+              {sittingLabel(s)}
+            </option>
+          ))}
+        </TextSelect>
+      </Field>
+      <Field label="Examination year" required error={err("examYear")}>
+        <TextSelect
+          value={exam.examYear}
+          onChange={(e) => onChange("examYear", e.target.value)}
+        >
+          <option value="">Select year</option>
+          {yearOptions(30, 0).map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </TextSelect>
+      </Field>
+      <Field label="Index number" required error={err("indexNumber")}>
+        <TextInput
+          value={exam.indexNumber}
+          onChange={(e) => onChange("indexNumber", e.target.value)}
+        />
+      </Field>
+      <Field label="Candidate number" required error={err("candidateNumber")}>
+        <TextInput
+          value={exam.candidateNumber}
+          onChange={(e) => onChange("candidateNumber", e.target.value)}
+        />
+      </Field>
+      <Field
+        label="Examination centre"
+        required
+        error={err("examinationCentre")}
+        className="sm:col-span-2"
+      >
+        <TextInput
+          value={exam.examinationCentre}
+          onChange={(e) => onChange("examinationCentre", e.target.value)}
+        />
+      </Field>
+    </div>
+  );
+}
+
+function InstitutionFields({
+  education,
+  errorPrefix,
+  errors,
+  onChange,
+}: {
+  education: EducationalBackgroundForm;
+  errorPrefix: string;
+  errors: Record<string, string>;
+  onChange: <K extends keyof EducationalBackgroundForm>(
+    key: K,
+    value: EducationalBackgroundForm[K],
+  ) => void;
+}) {
+  const err = (key: string) =>
+    errors[`${errorPrefix}.${key}`] || (errorPrefix === "0" ? errors[key] : undefined);
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field
+        label="Institution name"
+        required
+        error={err("institutionName")}
+        className="sm:col-span-2"
+      >
+        <SearchableSelect
+          options={GHANA_SHS_SCHOOLS}
+          value={education.institutionName}
+          onChange={(v) => onChange("institutionName", v)}
+          placeholder="Search SHS…"
+          allowOther
+          error={!!err("institutionName")}
+        />
+      </Field>
+      <Field label="Institution type" required error={err("institutionType")}>
+        <TextSelect
+          value={education.institutionType}
+          onChange={(e) =>
+            onChange(
+              "institutionType",
+              e.target.value as EducationalBackgroundForm["institutionType"],
+            )
+          }
+        >
+          {INSTITUTION_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </TextSelect>
+      </Field>
+      <Field label="Programme pursued" required error={err("programmePursued")}>
+        <TextSelect
+          value={education.programmePursued}
+          onChange={(e) =>
+            onChange(
+              "programmePursued",
+              e.target.value as EducationalBackgroundForm["programmePursued"],
+            )
+          }
+        >
+          {SHS_PROGRAMMES.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </TextSelect>
+      </Field>
+      <Field label="Start date" required error={err("startDate")}>
+        <TextInput
+          type="date"
+          value={education.startDate}
+          onChange={(e) => onChange("startDate", e.target.value)}
+        />
+      </Field>
+      <Field label="End date" required error={err("endDate")}>
+        <TextInput
+          type="date"
+          value={education.endDate}
+          onChange={(e) => onChange("endDate", e.target.value)}
+        />
+      </Field>
+      <Field label="Country of institution" required error={err("country")}>
+        <TextSelect
+          value={education.country}
+          onChange={(e) =>
+            onChange("country", e.target.value as EducationalBackgroundForm["country"])
+          }
+        >
+          {COUNTRIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </TextSelect>
+      </Field>
+      <Field label="Region of institution" required error={err("region")}>
+        <TextSelect
+          value={education.region}
+          onChange={(e) =>
+            onChange("region", e.target.value as EducationalBackgroundForm["region"])
+          }
+        >
+          {GHANA_REGIONS.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </TextSelect>
+      </Field>
+    </div>
+  );
+}
+
 export function MultiStepApplicationForm({
   schoolId,
   schoolName,
   schoolSlug,
+  schoolLogo,
+  brandColor,
+  brandColors,
+  schoolPhone,
+  schoolEmail,
+  schoolAddress,
   voucherCode: voucherCodeProp,
   serialNumber: serialNumberProp,
   loginEmail,
@@ -113,6 +362,10 @@ export function MultiStepApplicationForm({
   const [draftMsg, setDraftMsg] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [existingApplicationNumber, setExistingApplicationNumber] = useState<
+    string | null
+  >(null);
 
   const formRef = React.useRef(form);
   const tabRef = React.useRef(tab);
@@ -152,22 +405,17 @@ export function MultiStepApplicationForm({
   }, [schoolId]);
 
   const mergeDraft = useCallback(
-    (draftForm: Partial<ApplicationFormState>, currentTab?: string) => {
-      setForm((prev) => ({
-        ...prev,
-        ...draftForm,
-        personal: { ...prev.personal, ...(draftForm.personal || {}) },
-        guardian: { ...prev.guardian, ...(draftForm.guardian || {}) },
-        programme: { ...prev.programme, ...(draftForm.programme || {}) },
-        education: { ...prev.education, ...(draftForm.education || {}) },
-        examination: {
-          ...prev.examination,
-          ...(draftForm.examination || {}),
-        },
-        results: { ...prev.results, ...(draftForm.results || {}) },
-        documents: { ...prev.documents, ...(draftForm.documents || {}) },
-        declarationAccepted: !!draftForm.declarationAccepted,
-      }));
+    (draftForm: Parameters<typeof normalizeApplicationForm>[0], currentTab?: string) => {
+      setForm((prev) =>
+        normalizeApplicationForm({
+          ...prev,
+          ...draftForm,
+          personal: { ...prev.personal, ...(draftForm?.personal || {}) },
+          guardian: { ...prev.guardian, ...(draftForm?.guardian || {}) },
+          programme: { ...prev.programme, ...(draftForm?.programme || {}) },
+          documents: { ...prev.documents, ...(draftForm?.documents || {}) },
+        }),
+      );
       if (currentTab) setTab(currentTab as ApplicationTabId);
     },
     [],
@@ -177,6 +425,28 @@ export function MultiStepApplicationForm({
     let cancelled = false;
 
     async function restore() {
+      let loadedApplication = false;
+      if (voucherCode && serialNumber) {
+        try {
+          const res = await fetch("/api/apply/voucher/validate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ schoolId, voucherCode, serialNumber }),
+          });
+          const data = await res.json();
+          if (!cancelled && res.ok && data.application) {
+            mergeDraft(formStateFromApplication(data.application));
+            setExistingApplicationNumber(
+              data.application.applicationNumber || null,
+            );
+            setDraftMsg("Your application details were loaded");
+            loadedApplication = true;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       try {
         const localRaw = window.localStorage.getItem(
           localDraftKey(schoolId, voucherCode || undefined, serialNumber || undefined),
@@ -195,7 +465,7 @@ export function MultiStepApplicationForm({
         // ignore
       }
 
-      if (voucherCode && serialNumber) {
+      if (!loadedApplication && voucherCode && serialNumber) {
         try {
           const res = await fetch(
             `/api/apply/draft?schoolId=${encodeURIComponent(schoolId)}&voucherCode=${encodeURIComponent(voucherCode)}&serialNumber=${encodeURIComponent(serialNumber)}`,
@@ -305,9 +575,22 @@ export function MultiStepApplicationForm({
     if (id === "personal") payload = form.personal;
     if (id === "guardian") payload = form.guardian;
     if (id === "programme") payload = form.programme;
-    if (id === "education") payload = form.education;
-    if (id === "examination") payload = form.examination;
-    if (id === "results") payload = form.results;
+    if (id === "education") payload = form.educations;
+    if (id === "examination") {
+      payload = {
+        educations: form.educations,
+        examSittings: form.examSittings,
+      };
+    }
+    if (id === "results") {
+      const resultErrors = validateExamResults(form.examSittings);
+      if (Object.keys(resultErrors).length) {
+        setErrors(resultErrors);
+        return false;
+      }
+      setErrors({});
+      return true;
+    }
     if (id === "documents") payload = form.documents;
     if (id === "review") payload = { declarationAccepted: form.declarationAccepted };
 
@@ -378,15 +661,22 @@ export function MultiStepApplicationForm({
     setSubmitError(null);
     try {
       const personal = form.personal;
-      const resultsPayload = [
-        ...form.results.coreResults.map((r) => ({
-          subject: r.subject,
-          grade: r.grade,
-        })),
-        ...form.results.electiveResults
-          .filter((r) => r.subject && r.grade)
-          .map((r) => ({ subject: r.subject!, grade: r.grade! })),
-      ];
+      const examinationSittings = form.examSittings.map((sitting) => ({
+        examType: sitting.examType,
+        examBody: sitting.examBody,
+        sitting: sitting.sitting,
+        examYear: sitting.examYear,
+        indexNumber: sitting.indexNumber,
+        candidateNumber: sitting.candidateNumber,
+        examinationCentre: sitting.examinationCentre,
+        institutionName:
+          form.educations[sitting.institutionIndex]?.institutionName || "",
+        results: flattenExamResults(sitting),
+      }));
+      const resultsPayload = examinationSittings.flatMap(
+        (sitting) => sitting.results,
+      );
+      const [firstSitting, ...otherSittings] = examinationSittings;
 
       const res = await fetch("/api/apply/submit", {
         method: "POST",
@@ -439,14 +729,16 @@ export function MultiStepApplicationForm({
             fourthChoiceProgramme: form.programme.fourthChoiceProgramme,
             fourthChoiceStream: form.programme.fourthChoiceStream,
           },
-          educationalBackground: [form.education],
-          examinationInfo: form.examination,
+          educationalBackground: form.educations,
+          examinationInfo: firstSitting,
+          additionalExaminations: otherSittings,
+          examinationSittings,
           results: resultsPayload,
           documents: {
             passportPhoto: form.documents.passportPhoto,
             resultSlip: form.documents.resultSlip,
-            birthCertificate: form.documents.birthCertificate,
-            nationalId: form.documents.nationalId || undefined,
+            birthCertificate: form.documents.birthCertificate || undefined,
+            nationalId: form.documents.nationalId,
             transcript: form.documents.sssceResultSlip || undefined,
           },
         }),
@@ -466,6 +758,10 @@ export function MultiStepApplicationForm({
         applicationNumber: data.application.applicationNumber,
         schoolName: data.application.schoolName || schoolName,
         updated: data.updated,
+        printout: printoutFromForm(
+          form,
+          data.application.applicationNumber,
+        ),
       });
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Submission failed");
@@ -489,16 +785,96 @@ export function MultiStepApplicationForm({
     value: ApplicationFormState["programme"][K],
   ) => setForm((f) => ({ ...f, programme: { ...f.programme, [key]: value } }));
 
-  const setEducation = <K extends keyof ApplicationFormState["education"]>(
+  const setEducationAt = <K extends keyof EducationalBackgroundForm>(
+    index: number,
     key: K,
-    value: ApplicationFormState["education"][K],
-  ) => setForm((f) => ({ ...f, education: { ...f.education, [key]: value } }));
-
-  const setExamination = <K extends keyof ApplicationFormState["examination"]>(
-    key: K,
-    value: ApplicationFormState["examination"][K],
+    value: EducationalBackgroundForm[K],
   ) =>
-    setForm((f) => ({ ...f, examination: { ...f.examination, [key]: value } }));
+    setForm((f) => ({
+      ...f,
+      educations: f.educations.map((row, i) =>
+        i === index ? { ...row, [key]: value } : row,
+      ),
+    }));
+
+  const addInstitution = () => {
+    setForm((f) => {
+      if (f.educations.length >= MAX_INSTITUTIONS) return f;
+      return { ...f, educations: [...f.educations, emptyEducation()] };
+    });
+  };
+
+  const removeInstitution = (index: number) => {
+    setForm((f) => {
+      if (f.educations.length <= 1) return f;
+      const educations = f.educations.filter((_, i) => i !== index);
+      return {
+        ...f,
+        educations,
+        examSittings: f.examSittings.map((sitting) => {
+          if (sitting.institutionIndex === index) {
+            return { ...sitting, institutionIndex: 0 };
+          }
+          if (sitting.institutionIndex > index) {
+            return {
+              ...sitting,
+              institutionIndex: sitting.institutionIndex - 1,
+            };
+          }
+          return sitting;
+        }),
+      };
+    });
+  };
+
+  const setExamSitting = <K extends keyof ExaminationSittingForm>(
+    index: number,
+    key: K,
+    value: ExaminationSittingForm[K],
+  ) =>
+    setForm((f) => ({
+      ...f,
+      examSittings: f.examSittings.map((row, i) =>
+        i === index ? { ...row, [key]: value } : row,
+      ),
+    }));
+
+  const setExamSittingInfo = (
+    index: number,
+    key: keyof ExaminationInfoForm,
+    value: ExaminationInfoForm[keyof ExaminationInfoForm],
+  ) =>
+    setForm((f) => ({
+      ...f,
+      examSittings: f.examSittings.map((row, i) =>
+        i === index ? { ...row, [key]: value } : row,
+      ),
+    }));
+
+  const addExamSitting = () => {
+    setForm((f) => {
+      if (f.examSittings.length >= MAX_EXAM_SITTINGS) return f;
+      const lastIndex =
+        f.examSittings[f.examSittings.length - 1]?.institutionIndex ?? 0;
+      return {
+        ...f,
+        examSittings: [
+          ...f.examSittings,
+          emptyExamSitting("Nov/Dec", lastIndex),
+        ],
+      };
+    });
+  };
+
+  const removeExamSitting = (index: number) => {
+    setForm((f) => {
+      if (f.examSittings.length <= 1) return f;
+      return {
+        ...f,
+        examSittings: f.examSittings.filter((_, i) => i !== index),
+      };
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -974,304 +1350,264 @@ export function MultiStepApplicationForm({
         )}
 
         {tab === "education" && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Institution name"
-              required
-              error={errors.institutionName}
-              className="sm:col-span-2"
-            >
-              <SearchableSelect
-                options={GHANA_SHS_SCHOOLS}
-                value={form.education.institutionName}
-                onChange={(v) => setEducation("institutionName", v)}
-                placeholder="Search SHS…"
-                allowOther
-                error={!!errors.institutionName}
-              />
-            </Field>
-            <Field label="Institution type" required error={errors.institutionType}>
-              <TextSelect
-                value={form.education.institutionType}
-                onChange={(e) =>
-                  setEducation(
-                    "institutionType",
-                    e.target.value as typeof form.education.institutionType,
-                  )
-                }
+          <div className="space-y-5">
+            <p className="text-sm text-[#64748B]">
+              Add every school you attended. You will attach exams and results
+              to a specific school in the next steps.
+            </p>
+            {form.educations.map((education, index) => (
+              <div
+                key={`education-${index}`}
+                className="rounded-2xl border border-[#E2E8F0] p-4"
               >
-                {INSTITUTION_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </TextSelect>
-            </Field>
-            <Field label="Programme pursued" required error={errors.programmePursued}>
-              <TextSelect
-                value={form.education.programmePursued}
-                onChange={(e) =>
-                  setEducation(
-                    "programmePursued",
-                    e.target.value as typeof form.education.programmePursued,
-                  )
-                }
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">
+                    Institution {index + 1}
+                    {education.institutionName ? ` — ${education.institutionName}` : ""}
+                  </h3>
+                  {form.educations.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => removeInstitution(index)}
+                      className="inline-flex items-center gap-1 rounded-full border border-[#FECACA] px-3 py-1 text-xs font-medium text-[#B91C1C] hover:bg-[#FEF2F2]"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <InstitutionFields
+                  education={education}
+                  errorPrefix={String(index)}
+                  errors={errors}
+                  onChange={(key, value) => setEducationAt(index, key, value)}
+                />
+              </div>
+            ))}
+            {form.educations.length < MAX_INSTITUTIONS ? (
+              <button
+                type="button"
+                onClick={addInstitution}
+                className="inline-flex items-center gap-2 rounded-full border border-dashed border-[var(--school-brand,#007AFF)] px-4 py-2.5 text-sm font-semibold text-[var(--school-brand,#007AFF)] hover:bg-[var(--school-brand-soft,#EFF6FF)]"
               >
-                {SHS_PROGRAMMES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </TextSelect>
-            </Field>
-            <Field label="Start date" required error={errors.startDate}>
-              <TextInput
-                type="date"
-                value={form.education.startDate}
-                onChange={(e) => setEducation("startDate", e.target.value)}
-              />
-            </Field>
-            <Field label="End date" required error={errors.endDate}>
-              <TextInput
-                type="date"
-                value={form.education.endDate}
-                onChange={(e) => setEducation("endDate", e.target.value)}
-              />
-            </Field>
-            <Field label="Country of institution" required error={errors.country}>
-              <TextSelect
-                value={form.education.country}
-                onChange={(e) =>
-                  setEducation(
-                    "country",
-                    e.target.value as typeof form.education.country,
-                  )
-                }
-              >
-                {COUNTRIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </TextSelect>
-            </Field>
-            <Field label="Region of institution" required error={errors.region}>
-              <TextSelect
-                value={form.education.region}
-                onChange={(e) =>
-                  setEducation(
-                    "region",
-                    e.target.value as typeof form.education.region,
-                  )
-                }
-              >
-                {GHANA_REGIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </TextSelect>
-            </Field>
+                <Plus className="h-4 w-4" />
+                Add another institution
+              </button>
+            ) : null}
           </div>
         )}
 
         {tab === "examination" && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Examination type" required error={errors.examType}>
-              <TextSelect
-                value={form.examination.examType}
-                onChange={(e) =>
-                  setExamination(
-                    "examType",
-                    e.target.value as typeof form.examination.examType,
-                  )
-                }
+          <div className="space-y-5">
+            <p className="text-sm text-[#64748B]">
+              Link each exam sitting to the school where you wrote it. Use this
+              for May/June, Nov/Dec (NOVDEC), or any other exam type.
+            </p>
+            {form.examSittings.map((sitting, index) => (
+              <div
+                key={`exam-${index}`}
+                className="rounded-2xl border border-[#E2E8F0] p-4"
               >
-                {EXAM_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </TextSelect>
-            </Field>
-            <Field label="Examination body" required error={errors.examBody}>
-              <TextSelect
-                value={form.examination.examBody}
-                onChange={(e) =>
-                  setExamination(
-                    "examBody",
-                    e.target.value as typeof form.examination.examBody,
-                  )
-                }
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">
+                    {index === 0 ? "Primary sitting" : `Additional sitting ${index}`}
+                    <span className="mt-0.5 block font-medium text-[#64748B]">
+                      {examSittingLabel(sitting, form.educations, index)}
+                    </span>
+                  </h3>
+                  {form.examSittings.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => removeExamSitting(index)}
+                      className="inline-flex items-center gap-1 rounded-full border border-[#FECACA] px-3 py-1 text-xs font-medium text-[#B91C1C] hover:bg-[#FEF2F2]"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mb-4">
+                  <Field
+                    label="School / institution for this exam"
+                    required
+                    error={errors[`examSittings.${index}.institutionIndex`]}
+                  >
+                    <TextSelect
+                      value={String(sitting.institutionIndex)}
+                      onChange={(e) =>
+                        setExamSitting(
+                          index,
+                          "institutionIndex",
+                          Number(e.target.value),
+                        )
+                      }
+                    >
+                      {form.educations.map((education, educationIndex) => (
+                        <option key={educationIndex} value={educationIndex}>
+                          {education.institutionName ||
+                            `Institution ${educationIndex + 1}`}
+                        </option>
+                      ))}
+                    </TextSelect>
+                  </Field>
+                </div>
+                <ExaminationSittingFields
+                  exam={sitting}
+                  errorPrefix={`examSittings.${index}`}
+                  errors={errors}
+                  onChange={(key, value) =>
+                    setExamSittingInfo(index, key, value)
+                  }
+                />
+              </div>
+            ))}
+            {form.examSittings.length < MAX_EXAM_SITTINGS ? (
+              <button
+                type="button"
+                onClick={addExamSitting}
+                className="inline-flex items-center gap-2 rounded-full border border-dashed border-[var(--school-brand,#007AFF)] px-4 py-2.5 text-sm font-semibold text-[var(--school-brand,#007AFF)] hover:bg-[var(--school-brand-soft,#EFF6FF)]"
               >
-                {EXAM_BODIES.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </TextSelect>
-            </Field>
-            <Field label="Sitting type" required error={errors.sitting}>
-              <TextSelect
-                value={form.examination.sitting}
-                onChange={(e) =>
-                  setExamination(
-                    "sitting",
-                    e.target.value as typeof form.examination.sitting,
-                  )
-                }
-              >
-                {SITTING_TYPES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </TextSelect>
-            </Field>
-            <Field label="Examination year" required error={errors.examYear}>
-              <TextSelect
-                value={form.examination.examYear}
-                onChange={(e) => setExamination("examYear", e.target.value)}
-              >
-                <option value="">Select year</option>
-                {yearOptions(30, 0).map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </TextSelect>
-            </Field>
-            <Field label="Index number" required error={errors.indexNumber}>
-              <TextInput
-                value={form.examination.indexNumber}
-                onChange={(e) => setExamination("indexNumber", e.target.value)}
-              />
-            </Field>
-            <Field label="Candidate number" required error={errors.candidateNumber}>
-              <TextInput
-                value={form.examination.candidateNumber}
-                onChange={(e) =>
-                  setExamination("candidateNumber", e.target.value)
-                }
-              />
-            </Field>
-            <Field
-              label="Examination centre"
-              required
-              error={errors.examinationCentre}
-              className="sm:col-span-2"
-            >
-              <TextInput
-                value={form.examination.examinationCentre}
-                onChange={(e) =>
-                  setExamination("examinationCentre", e.target.value)
-                }
-              />
-            </Field>
+                <Plus className="h-4 w-4" />
+                Add another examination
+              </button>
+            ) : null}
+            {errors.examSittings ? (
+              <p className="text-xs text-red-600">{errors.examSittings}</p>
+            ) : null}
           </div>
         )}
 
         {tab === "results" && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="mb-3 text-sm font-semibold text-[#0F172A]">
-                Core subjects
-              </h3>
-              <div className="space-y-2">
-                {CORE_SUBJECTS.map((subject, index) => (
-                  <div
-                    key={subject}
-                    className="grid grid-cols-[1fr_8rem] items-center gap-2"
-                  >
-                    <span className="text-sm text-[#334155]">{subject}</span>
-                    <TextSelect
-                      value={form.results.coreResults[index]?.grade || ""}
-                      onChange={(e) => {
-                        const next = [...form.results.coreResults];
-                        next[index] = {
-                          subject,
-                          grade: e.target.value as (typeof WASSCE_GRADES)[number],
-                        };
-                        setForm((f) => ({
-                          ...f,
-                          results: { ...f.results, coreResults: next },
-                        }));
-                      }}
-                    >
-                      <option value="">Grade</option>
-                      {WASSCE_GRADES.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
+          <div className="space-y-5">
+            <p className="text-sm text-[#64748B]">
+              Enter results for each exam sitting. The first sitting needs all
+              core grades. Extra sittings, such as Nov/Dec, can include only the
+              subjects you wrote.
+            </p>
+            {form.examSittings.map((sitting, sittingIndex) => (
+              <div
+                key={`results-${sittingIndex}`}
+                className="rounded-2xl border border-[#E2E8F0] p-4"
+              >
+                <h3 className="mb-4 text-sm font-semibold text-[#0F172A]">
+                  {examSittingLabel(sitting, form.educations, sittingIndex)}
+                </h3>
+                {errors[`examSittings.${sittingIndex}`] ? (
+                  <p className="mb-3 text-xs text-red-600">
+                    {errors[`examSittings.${sittingIndex}`]}
+                  </p>
+                ) : null}
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="mb-3 text-sm font-semibold text-[#334155]">
+                      Core subjects
+                      {sittingIndex === 0 ? " (required)" : " (if written)"}
+                    </h4>
+                    <div className="space-y-2">
+                      {CORE_SUBJECTS.map((subject, index) => (
+                        <div
+                          key={subject}
+                          className="grid grid-cols-[1fr_8rem] items-center gap-2"
+                        >
+                          <span className="text-sm text-[#334155]">{subject}</span>
+                          <TextSelect
+                            value={sitting.coreResults[index]?.grade || ""}
+                            onChange={(e) => {
+                              const next = [...sitting.coreResults];
+                              next[index] = {
+                                subject,
+                                grade: e.target.value as (typeof WASSCE_GRADES)[number],
+                              };
+                              setExamSitting(sittingIndex, "coreResults", next);
+                            }}
+                          >
+                            <option value="">Grade</option>
+                            {WASSCE_GRADES.map((g) => (
+                              <option key={g} value={g}>
+                                {g}
+                              </option>
+                            ))}
+                          </TextSelect>
+                        </div>
                       ))}
-                    </TextSelect>
+                    </div>
+                    {errors[`examSittings.${sittingIndex}.coreResults`] ? (
+                      <p className="mt-2 text-xs text-red-600">
+                        {errors[`examSittings.${sittingIndex}.coreResults`]}
+                      </p>
+                    ) : null}
                   </div>
-                ))}
-              </div>
-              {errors.coreResults && (
-                <p className="mt-2 text-xs text-red-600">{errors.coreResults}</p>
-              )}
-            </div>
-            <div>
-              <h3 className="mb-3 text-sm font-semibold text-[#0F172A]">
-                Elective subjects (up to 8)
-              </h3>
-              <div className="space-y-2">
-                {form.results.electiveResults.map((row, index) => (
-                  <div key={index} className="grid grid-cols-2 gap-2">
-                    <TextSelect
-                      value={row.subject || ""}
-                      onChange={(e) => {
-                        const next = [...form.results.electiveResults];
-                        next[index] = { ...row, subject: e.target.value };
-                        setForm((f) => ({
-                          ...f,
-                          results: { ...f.results, electiveResults: next },
-                        }));
-                      }}
-                    >
-                      <option value="">Subject</option>
-                      {ELECTIVE_SUBJECTS.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
+                  <div>
+                    <h4 className="mb-3 text-sm font-semibold text-[#334155]">
+                      Elective subjects (up to 8)
+                    </h4>
+                    <div className="space-y-2">
+                      {sitting.electiveResults.map((row, index) => (
+                        <div key={index} className="grid grid-cols-2 gap-2">
+                          <TextSelect
+                            value={row.subject || ""}
+                            onChange={(e) => {
+                              const next = [...sitting.electiveResults];
+                              next[index] = { ...row, subject: e.target.value };
+                              setExamSitting(
+                                sittingIndex,
+                                "electiveResults",
+                                next,
+                              );
+                            }}
+                          >
+                            <option value="">Subject</option>
+                            {ELECTIVE_SUBJECTS.map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </TextSelect>
+                          <TextSelect
+                            value={row.grade || ""}
+                            onChange={(e) => {
+                              const next = [...sitting.electiveResults];
+                              next[index] = { ...row, grade: e.target.value };
+                              setExamSitting(
+                                sittingIndex,
+                                "electiveResults",
+                                next,
+                              );
+                            }}
+                          >
+                            <option value="">Grade</option>
+                            {WASSCE_GRADES.map((g) => (
+                              <option key={g} value={g}>
+                                {g}
+                              </option>
+                            ))}
+                          </TextSelect>
+                        </div>
                       ))}
-                    </TextSelect>
-                    <TextSelect
-                      value={row.grade || ""}
-                      onChange={(e) => {
-                        const next = [...form.results.electiveResults];
-                        next[index] = { ...row, grade: e.target.value };
-                        setForm((f) => ({
-                          ...f,
-                          results: { ...f.results, electiveResults: next },
-                        }));
-                      }}
-                    >
-                      <option value="">Grade</option>
-                      {WASSCE_GRADES.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
-                      ))}
-                    </TextSelect>
+                    </div>
+                    {errors[`examSittings.${sittingIndex}.electiveResults`] ? (
+                      <p className="mt-2 text-xs text-red-600">
+                        {errors[`examSittings.${sittingIndex}.electiveResults`]}
+                      </p>
+                    ) : null}
                   </div>
-                ))}
+                </div>
               </div>
-              {errors.electiveResults && (
-                <p className="mt-2 text-xs text-red-600">
-                  {errors.electiveResults}
-                </p>
-              )}
-            </div>
+            ))}
           </div>
         )}
 
         {tab === "documents" && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-4">
+            <p className="text-sm text-[#64748B]">
+              A Ghana Card or other national ID is required. Birth certificate
+              is optional.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
             <FileDropzone
               label="Passport photograph"
               required
+              preview="photo"
               accept="image/jpeg,image/jpg,image/png,.jpg,.jpeg,.png"
               maxMb={5}
               value={form.documents.passportPhoto}
@@ -1310,8 +1646,27 @@ export function MultiStepApplicationForm({
               }
             />
             <FileDropzone
-              label="Birth certificate"
+              label="Ghana Card / National ID"
               required
+              accept="image/jpeg,image/jpg,image/png,application/pdf,.pdf,.jpg,.jpeg,.png"
+              maxMb={10}
+              value={form.documents.nationalId}
+              error={errors.nationalId}
+              onUploaded={(url) =>
+                setForm((f) => ({
+                  ...f,
+                  documents: { ...f.documents, nationalId: url },
+                }))
+              }
+              onClear={() =>
+                setForm((f) => ({
+                  ...f,
+                  documents: { ...f.documents, nationalId: "" },
+                }))
+              }
+            />
+            <FileDropzone
+              label="Birth certificate (optional)"
               accept="image/jpeg,image/jpg,image/png,application/pdf,.pdf,.jpg,.jpeg,.png"
               maxMb={10}
               value={form.documents.birthCertificate}
@@ -1347,109 +1702,59 @@ export function MultiStepApplicationForm({
                 }))
               }
             />
-            <FileDropzone
-              label="National ID (Ghana Card / Passport / Voter ID)"
-              accept="image/jpeg,image/jpg,image/png,application/pdf,.pdf,.jpg,.jpeg,.png"
-              maxMb={10}
-              value={form.documents.nationalId}
-              onUploaded={(url) =>
-                setForm((f) => ({
-                  ...f,
-                  documents: { ...f.documents, nationalId: url },
-                }))
-              }
-              onClear={() =>
-                setForm((f) => ({
-                  ...f,
-                  documents: { ...f.documents, nationalId: "" },
-                }))
-              }
-            />
+            </div>
           </div>
         )}
 
         {tab === "review" && (
           <div className="space-y-4 text-sm">
-            <ReviewBlock title="Passport photograph">
-              {form.documents.passportPhoto ? (
-                <div className="flex items-start gap-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={form.documents.passportPhoto}
-                    alt="Passport photograph"
-                    className="h-36 w-28 rounded-xl border border-[#E2E8F0] object-cover shadow-sm"
-                  />
-                  <p className="text-xs text-[#64748B]">
-                    Confirm this is a clear passport-size photo before submitting.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-red-600">No passport photograph uploaded.</p>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                disabled={downloadingPdf}
+                onClick={() => {
+                  setDownloadingPdf(true);
+                  void downloadApplicationPrintout({
+                    school: {
+                      name: schoolName,
+                      logoSrc: schoolLogo,
+                      brandColor,
+                      brandColors,
+                      phone: schoolPhone,
+                      email: schoolEmail,
+                      address: schoolAddress,
+                    },
+                    data: printoutFromForm(
+                      form,
+                      existingApplicationNumber || undefined,
+                    ),
+                  }).finally(() => setDownloadingPdf(false));
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] disabled:opacity-60"
+              >
+                {downloadingPdf ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {downloadingPdf ? "Preparing PDF…" : "Download summary PDF"}
+              </button>
+            </div>
+            <ApplicationPrintout
+              school={{
+                name: schoolName,
+                logoSrc: schoolLogo,
+                brandColor,
+                brandColors,
+                phone: schoolPhone,
+                email: schoolEmail,
+                address: schoolAddress,
+              }}
+              data={printoutFromForm(
+                form,
+                existingApplicationNumber || undefined,
               )}
-            </ReviewBlock>
-            <ReviewBlock title="Personal">
-              <p>
-                {form.personal.title} {form.personal.firstName}{" "}
-                {form.personal.middleName} {form.personal.surname}
-              </p>
-              <p>
-                {form.personal.gender} · {form.personal.maritalStatus}
-              </p>
-              <p>
-                DOB: {form.personal.dateOfBirthDay}/
-                {form.personal.dateOfBirthMonth}/{form.personal.dateOfBirthYear}
-              </p>
-              <p>
-                {form.personal.phoneNumber} · {form.personal.email}
-              </p>
-              <p>
-                {form.personal.homeRegion}, {form.personal.homeCountry} ·{" "}
-                {form.personal.nationality}
-              </p>
-            </ReviewBlock>
-            <ReviewBlock title="Guardian">
-              <p>
-                {form.guardian.guardianTitle} {form.guardian.guardianName} (
-                {form.guardian.relationship})
-              </p>
-              <p>{form.guardian.phoneNumber}</p>
-            </ReviewBlock>
-            <ReviewBlock title="Programme choices">
-              <p>
-                1st: {form.programme.firstChoiceProgramme} —{" "}
-                {form.programme.firstChoiceStream}
-              </p>
-              {form.programme.secondChoiceProgramme && (
-                <p>
-                  2nd: {form.programme.secondChoiceProgramme} —{" "}
-                  {form.programme.secondChoiceStream}
-                </p>
-              )}
-            </ReviewBlock>
-            <ReviewBlock title="Education">
-              <p>
-                {form.education.institutionName} ({form.education.institutionType})
-              </p>
-              <p>{form.education.programmePursued}</p>
-            </ReviewBlock>
-            <ReviewBlock title="Examination">
-              <p>
-                {form.examination.examType} · {form.examination.sitting}{" "}
-                {form.examination.examYear}
-              </p>
-              <p>Index: {form.examination.indexNumber}</p>
-            </ReviewBlock>
-            <ReviewBlock title="Documents">
-              <p>
-                WASSCE result slip:{" "}
-                {form.documents.resultSlip ? "Uploaded" : "Missing"}
-              </p>
-              <p>
-                Birth certificate:{" "}
-                {form.documents.birthCertificate ? "Uploaded" : "Missing"}
-              </p>
-              {form.documents.nationalId ? <p>National ID: Uploaded</p> : null}
-            </ReviewBlock>
+            />
             <label className="flex items-start gap-3 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
               <input
                 type="checkbox"
@@ -1500,7 +1805,9 @@ export function MultiStepApplicationForm({
               ) : (
                 <CheckCircle2 className="h-4 w-4" />
               )}
-              Submit application
+              {existingApplicationNumber
+                ? "Save changes"
+                : "Submit application"}
             </button>
           ) : (
             <button
@@ -1513,21 +1820,6 @@ export function MultiStepApplicationForm({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function ReviewBlock({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#F1F5F9] p-4">
-      <h4 className="mb-2 font-semibold text-[#0F172A]">{title}</h4>
-      <div className="space-y-1 text-[#475569]">{children}</div>
     </div>
   );
 }

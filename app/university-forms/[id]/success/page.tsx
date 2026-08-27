@@ -111,10 +111,10 @@ function UniversityFormSuccessContent() {
 
   return (
     <div className="min-h-screen bg-white text-[#1E1E1E]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-4 md:px-10 md:py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-8 sm:px-6 md:gap-5 md:px-10 md:pb-10">
         <Header />
 
-        <main className="mt-10 space-y-6 md:mt-16">
+        <main className="space-y-6">
           <h1 className="text-3xl font-semibold leading-tight md:text-4xl">
             Voucher purchase
           </h1>
@@ -158,7 +158,7 @@ function UniversityFormSuccessContent() {
                         <p className="text-[11px] font-medium uppercase tracking-wide text-[#9CA3AF]">
                           Voucher details (keep this safe)
                         </p>
-                        <div className="inline-flex flex-col gap-1 rounded-2xl border border-dashed border-[#D1D5DB] bg-white px-4 py-3 font-mono text-xs">
+                        <div className="inline-flex flex-col gap-1 rounded-2xl border border-dashed border-[#D1D5DB] bg-white px-4 py-3 font-mono text-xs text-[#111827]">
                           <span>Serial: {voucher.serial}</span>
                           <span>PIN: {voucher.pin}</span>
                         </div>

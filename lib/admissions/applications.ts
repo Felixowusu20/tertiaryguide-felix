@@ -8,6 +8,7 @@ import type {
   PersonalInfo,
   ProgrammeChoices,
   ExaminationInfo,
+  ExaminationSitting,
   UploadedDocuments,
 } from "./types";
 import { APPLICATION_STATUSES } from "./types";
@@ -115,6 +116,8 @@ export function serializeApplication(doc: ApplicationDoc) {
     programmeChoices: doc.programmeChoices ?? null,
     educationalBackground: doc.educationalBackground ?? [],
     examinationInfo: doc.examinationInfo ?? null,
+    additionalExaminations: doc.additionalExaminations ?? [],
+    examinationSittings: doc.examinationSittings ?? [],
     results: doc.results ?? [],
     documents: doc.documents ?? null,
     submittedAt:
@@ -228,7 +231,7 @@ export function parseEducationalBackground(raw: unknown): EducationalBackground[
 }
 
 export function parseExaminationInfo(raw: unknown): ExaminationInfo | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const body = raw as Record<string, unknown>;
   return {
     examType: optionalTrimmed(body, "examType"),
@@ -238,7 +241,40 @@ export function parseExaminationInfo(raw: unknown): ExaminationInfo | undefined 
     indexNumber: optionalTrimmed(body, "indexNumber"),
     candidateNumber: optionalTrimmed(body, "candidateNumber"),
     examinationCentre: optionalTrimmed(body, "examinationCentre"),
+    institutionName: optionalTrimmed(body, "institutionName"),
   };
+}
+
+export function parseAdditionalExaminations(raw: unknown): ExaminationInfo[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => parseExaminationInfo(item))
+    .filter((item): item is ExaminationInfo => Boolean(item))
+    .filter(
+      (item) =>
+        item.examYear ||
+        item.indexNumber ||
+        item.candidateNumber ||
+        item.examinationCentre,
+    );
+}
+
+export function parseExaminationSittings(raw: unknown): ExaminationSitting[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((body) => ({
+      ...(parseExaminationInfo(body) || {}),
+      results: parseResults(body.results),
+    }))
+    .filter(
+      (item) =>
+        item.examYear ||
+        item.indexNumber ||
+        item.candidateNumber ||
+        item.examinationCentre ||
+        (item.results && item.results.length > 0),
+    );
 }
 
 export function parseResults(raw: unknown): ExamResult[] {

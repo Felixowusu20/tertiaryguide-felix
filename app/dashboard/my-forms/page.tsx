@@ -1,26 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  BookOpen,
   Copy,
   ExternalLink,
   GraduationCap,
-  KeyRound,
   Loader2,
+  MousePointerClick,
 } from "lucide-react";
 import { AssistanceRequestForm } from "@/app/components/AssistanceRequestForm";
-import { ApplicationStatusCard } from "@/app/components/ApplicationStatusCard";
-import { ProgrammeChoicesList } from "@/app/components/ProgrammeChoicesList";
 import { writeApplySession } from "@/lib/admissions/applicant-session";
-import {
-  listProgrammeChoices,
-  type RankedProgrammeChoice,
-} from "@/lib/admissions/programme-choices";
-import { studentStatusBadgeClass, studentStatusCopy } from "@/lib/admissions/status-messages";
 
 interface Purchase {
   id: string;
@@ -34,55 +26,19 @@ interface Purchase {
   voucher?: { serial: string; pin: string } | null;
   programmeLevel?: "undergraduate" | "postgraduate";
   status: "issued" | "pending" | "used";
-  application?: {
-    id: string;
-    applicationNumber: string;
-    status: string;
-    programmes?: RankedProgrammeChoice[];
-    programme?: string | null;
-    detail?: {
-      programmeChoices?: Record<string, string | undefined> | null;
-    };
-  } | null;
 }
 
 const APPLICANT_SESSION_KEY = "tg_applicant_session";
-
-function programmesFor(purchase: Purchase): RankedProgrammeChoice[] {
-  if (purchase.application?.programmes?.length) {
-    return purchase.application.programmes;
-  }
-  return listProgrammeChoices(
-    purchase.application?.detail?.programmeChoices,
-    purchase.application?.programme,
-  );
-}
-
-function applicationStatusClass(status: string) {
-  switch (status) {
-    case "Approved":
-    case "Admitted":
-    case "accepted":
-      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100";
-    case "Rejected":
-      return "bg-red-50 text-red-700 ring-1 ring-red-100";
-    case "Under Review":
-      return "bg-amber-50 text-amber-700 ring-1 ring-amber-100";
-    case "Pending":
-      return "bg-sky-50 text-sky-700 ring-1 ring-sky-100";
-    default:
-      return "bg-slate-50 text-slate-600 ring-1 ring-slate-100";
-  }
-}
 
 export default function MyFormsDashboardPage() {
   const router = useRouter();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [openVoucherId, setOpenVoucherId] = useState<string | null>(null);
+  const [flippedIds, setFlippedIds] = useState<Set<string>>(new Set());
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
 
   const [showAssistance, setShowAssistance] = useState(false);
   const [assistanceSession, setAssistanceSession] = useState(0);
@@ -105,6 +61,7 @@ export default function MyFormsDashboardPage() {
             p.type === "university_form" || p.type === "partner_voucher",
         );
         setPurchases(filtered);
+        setError(null);
       } else {
         setError(data.error || "Failed to fetch purchases.");
       }
@@ -135,10 +92,57 @@ export default function MyFormsDashboardPage() {
     return () => window.removeEventListener("tg-purchases-updated", handleUpdate);
   }, [router]);
 
-  const copyToClipboard = (text: string, id: string) => {
+  const copyToClipboard = (
+    e: React.MouseEvent,
+    text: string,
+    id: string,
+  ) => {
+    e.stopPropagation();
     void navigator.clipboard.writeText(text);
     setCopyingId(id);
     setTimeout(() => setCopyingId(null), 2000);
+  };
+
+  const toggleFlip = (id: string) => {
+    setFlippedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isNoFlipTarget = (target: EventTarget | null) =>
+    target instanceof Element && Boolean(target.closest("[data-no-flip]"));
+
+  const onCardPointerDown = (event: React.PointerEvent) => {
+    if (isNoFlipTarget(event.target)) {
+      pointerStart.current = null;
+      return;
+    }
+    pointerStart.current = { x: event.clientX, y: event.clientY };
+  };
+
+  const onCardPointerUp = (event: React.PointerEvent, id: string) => {
+    if (isNoFlipTarget(event.target)) {
+      pointerStart.current = null;
+      return;
+    }
+    const start = pointerStart.current;
+    pointerStart.current = null;
+    if (!start) return;
+    const moved =
+      Math.abs(event.clientX - start.x) > 10 ||
+      Math.abs(event.clientY - start.y) > 10;
+    if (moved) return;
+    toggleFlip(id);
+  };
+
+  const onCardKeyDown = (event: React.KeyboardEvent, id: string) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleFlip(id);
+    }
   };
 
   const openPartnerApplication = async (purchase: Purchase) => {
@@ -193,26 +197,10 @@ export default function MyFormsDashboardPage() {
   };
 
   function statusLabel(purchase: Purchase) {
-    if (purchase.application?.status) {
-      return studentStatusCopy(purchase.application.status).badge;
-    }
     if (purchase.status === "pending") return "Pending voucher";
-    if (purchase.status === "used") return "Submitted";
     if (purchase.type === "partner_voucher") return "Ready to apply";
     return "Active";
   }
-
-  const chosenProgrammes = useMemo(() => {
-    return purchases.flatMap((purchase) =>
-      programmesFor(purchase).map((programme) => ({
-        ...programme,
-        schoolName: purchase.schoolName || "School",
-        schoolLogo: purchase.schoolLogo,
-        applicationStatus: purchase.application?.status || statusLabel(purchase),
-        purchaseId: purchase.id,
-      })),
-    );
-  }, [purchases]);
 
   if (loading) {
     return (
@@ -225,13 +213,97 @@ export default function MyFormsDashboardPage() {
 
   return (
     <>
+      <style jsx global>{`
+        .form-vouchers-scroll {
+          display: flex;
+          gap: 1.25rem;
+          overflow-x: auto;
+          overflow-y: hidden;
+          overscroll-behavior-x: contain;
+          scroll-snap-type: x proximity;
+          -webkit-overflow-scrolling: touch;
+          padding: 4px 2px 12px;
+          scrollbar-width: thin;
+        }
+        .form-flip-card {
+          background-color: transparent;
+          perspective: 1000px;
+          flex: 0 0 min(85vw, 340px);
+          scroll-snap-align: start;
+        }
+        @media (min-width: 768px) {
+          .form-flip-card {
+            flex-basis: 360px;
+          }
+        }
+        .form-flip-card-inner {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          min-height: inherit;
+          transition: transform 0.6s;
+          transform-style: preserve-3d;
+          cursor: pointer;
+        }
+        .form-flip-card.flipped .form-flip-card-inner {
+          transform: rotateY(180deg);
+        }
+        .form-flip-card-front,
+        .form-flip-card-back {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          min-height: 100%;
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+          border-radius: 32px;
+        }
+        .form-flip-card-back {
+          transform: rotateY(180deg);
+          overflow: hidden;
+        }
+        .form-flip-card-back-scroll {
+          height: 100%;
+          overflow-x: hidden;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
+        }
+        .form-shimmer {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 200%;
+          height: 100%;
+          background: linear-gradient(
+            to right,
+            transparent 0%,
+            rgba(255, 255, 255, 0) 30%,
+            rgba(255, 255, 255, 0.12) 50%,
+            rgba(255, 255, 255, 0) 70%,
+            transparent 100%
+          );
+          transform: skewX(-20deg);
+          animation: form-shimmer 3s infinite linear;
+          pointer-events: none;
+        }
+        @keyframes form-shimmer {
+          0% {
+            transform: translateX(-150%) skewX(-20deg);
+          }
+          100% {
+            transform: translateX(50%) skewX(-20deg);
+          }
+        }
+      `}</style>
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 space-y-1">
           <h1 className="text-2xl font-semibold leading-tight text-[#1E1E1E] sm:text-3xl">
             My Forms
           </h1>
           <p className="text-sm text-[#555555]">
-            Your applications, chosen programmes, and vouchers in one place
+            Your vouchers in one place
           </p>
         </div>
 
@@ -266,10 +338,10 @@ export default function MyFormsDashboardPage() {
           <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF6FF]">
             <GraduationCap className="h-7 w-7 text-[#007AFF]" />
           </span>
-          <h2 className="mb-2 text-xl font-bold text-[#1E1E1E]">No applications yet</h2>
+          <h2 className="mb-2 text-xl font-bold text-[#1E1E1E]">No vouchers yet</h2>
           <p className="mb-8 max-w-sm text-sm text-[#555555]">
-            Buy a university form or a direct-application voucher, then your chosen
-            programmes will appear here.
+            Buy a university form or a direct-application voucher and it will
+            show up here.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -282,275 +354,222 @@ export default function MyFormsDashboardPage() {
               href="/apply"
               className="rounded-full border border-[#007AFF] px-8 py-3 text-sm font-medium text-[#007AFF] transition hover:bg-[#EFF6FF]"
             >
-              Direct Applications
+              Apply online
             </Link>
           </div>
         </div>
       ) : (
-        <div className="mt-8 space-y-6">
-          <section className="rounded-[28px] border border-[#E8EEF5] bg-white p-5 sm:p-6">
-            <div className="mb-5 flex items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#007AFF] text-white">
-                <BookOpen className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-[#0F172A]">
-                  Applied & chosen programmes
-                </h2>
-                <p className="text-sm text-[#64748B]">
-                  {chosenProgrammes.length > 0
-                    ? `${chosenProgrammes.length} programme${chosenProgrammes.length === 1 ? "" : "s"} across your applications`
-                    : "Programme choices will show here after you submit an application"}
-                </p>
-              </div>
-            </div>
-            {chosenProgrammes.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-[#D7E3F4] bg-[#F8FAFC] px-4 py-4 text-sm text-[#64748B]">
-                You have forms linked to your account, but no programme choices yet.
-                Open an application to select your 1st–4th choices.
-              </p>
-            ) : (
-              <ul className="grid auto-rows-fr grid-cols-1 gap-3 min-[640px]:grid-cols-2 xl:grid-cols-4">
-                {chosenProgrammes.map((item) => (
-                  <li
-                    key={`${item.purchaseId}-${item.rank}-${item.display}`}
-                    className="flex h-full items-start gap-3 rounded-2xl border border-[#EEF2F7] bg-[#F8FBFF] px-4 py-3.5"
-                  >
-                    {item.schoolLogo ? (
-                      <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-[#EEF2F7]">
-                        <Image
-                          src={item.schoolLogo}
-                          alt=""
-                          fill
-                          className="object-contain p-1"
-                        />
-                      </span>
-                    ) : (
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-[#007AFF] ring-1 ring-[#EEF2F7]">
-                        {item.rank}
-                      </span>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="rounded-full bg-[#007AFF]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#007AFF]">
-                          {item.label}
-                        </span>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${studentStatusBadgeClass(item.applicationStatus)}`}
-                        >
-                          {studentStatusCopy(item.applicationStatus).badge}
-                        </span>
-                      </div>
-                      <p className="mt-1.5 line-clamp-2 text-sm font-semibold leading-snug text-[#0F172A]">
-                        {item.programme}
-                      </p>
-                      {item.stream ? (
-                        <p className="mt-0.5 truncate text-xs text-[#64748B]">
-                          {item.stream}
-                        </p>
-                      ) : null}
-                      <p className="mt-1 truncate text-xs font-medium text-[#94A3B8]">
-                        {item.schoolName}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section>
-            <h2 className="mb-4 text-base font-semibold text-[#0F172A]">
-              Applications & vouchers
-            </h2>
-            <div className="grid auto-rows-fr grid-cols-1 gap-5 xl:grid-cols-2">
+        <div className="mt-8">
+          <p className="mb-5 text-sm text-[#64748B]">
+            Tap a card to flip it and view the serial and PIN. Tap again to
+            flip it back.
+          </p>
+          <div className="form-vouchers-scroll">
               {purchases.map((purchase) => {
-                const programmes = programmesFor(purchase);
-                const voucherOpen = openVoucherId === purchase.id;
+                const isFlipped = flippedIds.has(purchase.id);
+                const isPartner = purchase.type === "partner_voucher";
+                const cardMinHeight = isFlipped
+                  ? purchase.voucher
+                    ? isPartner
+                      ? 360
+                      : 300
+                    : 260
+                  : 220;
+
                 return (
-                  <article
+                  <div
                     key={purchase.id}
-                    className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[#E8EEF5] bg-white"
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isFlipped}
+                    aria-label={`${purchase.schoolName || "School form"} voucher. ${isFlipped ? "Showing serial and PIN. Activate to flip back." : "Activate to view serial and PIN."}`}
+                    className={`form-flip-card ${isFlipped ? "flipped" : ""}`}
+                    style={{ minHeight: cardMinHeight }}
+                    onPointerDown={onCardPointerDown}
+                    onPointerUp={(event) => onCardPointerUp(event, purchase.id)}
+                    onKeyDown={(event) => onCardKeyDown(event, purchase.id)}
                   >
                     <div
-                      className={`px-5 py-5 sm:px-6 ${
-                        purchase.type === "partner_voucher"
-                          ? "bg-[#ECFDF5]"
-                          : "bg-[#EFF6FF]"
-                      }`}
+                      className="form-flip-card-inner"
+                      style={{ minHeight: cardMinHeight }}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          {purchase.schoolLogo ? (
-                            <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-black/5">
-                              <Image
-                                src={purchase.schoolLogo}
-                                alt=""
-                                fill
-                                className="object-contain p-1"
-                              />
-                            </span>
-                          ) : (
-                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-[#007AFF] ring-1 ring-black/5">
-                              <GraduationCap className="h-5 w-5" />
-                            </span>
-                          )}
-                          <div className="min-w-0">
-                            <h3 className="truncate text-base font-semibold text-[#0F172A]">
-                              {purchase.schoolName}
-                            </h3>
-                            <p className="truncate text-xs text-[#64748B]">
-                              {purchase.programmeLevel === "postgraduate"
-                                ? "Postgraduate"
-                                : "Undergraduate"}{" "}
-                              ·{" "}
-                              {new Date(purchase.date).toLocaleDateString("en-GB", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })}
-                              {purchase.application?.applicationNumber
-                                ? ` · ${purchase.application.applicationNumber}`
-                                : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <span
-                            className={`rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                              purchase.type === "partner_voucher"
-                                ? "text-[#0F766E]"
-                                : "text-[#007AFF]"
-                            }`}
-                          >
-                            {purchase.type === "partner_voucher"
-                              ? "Direct apply"
-                              : "University form"}
-                          </span>
-                          <span
-                            className={`rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold ${
-                              purchase.application?.status
-                                ? studentStatusBadgeClass(purchase.application.status)
-                                : applicationStatusClass(statusLabel(purchase))
-                            }`}
-                          >
-                            {statusLabel(purchase)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-1 flex-col gap-4 px-5 py-5 sm:px-6">
-                      {purchase.type === "partner_voucher" ? (
-                        <>
-                          {purchase.application?.status ? (
-                            <ApplicationStatusCard
-                              status={purchase.application.status}
-                              schoolName={purchase.schoolName}
-                              compact
-                            />
-                          ) : null}
-                          <ProgrammeChoicesList
-                            title="Chosen programmes"
-                            programmes={programmes}
-                            columns={2}
-                            emptyLabel="No programmes chosen on this application yet."
-                          />
-                        </>
-                      ) : (
-                        <p className="text-sm text-[#64748B]">
-                          University form voucher. Use the serial and PIN on the
-                          school’s own portal.
-                        </p>
-                      )}
-
-                      {voucherOpen && purchase.voucher ? (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          {(
-                            [
-                              ["Serial", purchase.voucher.serial, "serial"],
-                              ["PIN", purchase.voucher.pin, "pin"],
-                            ] as const
-                          ).map(([label, value, key]) => (
-                            <div
-                              key={key}
-                              className="rounded-2xl bg-[#0B1220] px-4 py-3 text-white"
+                      <article
+                        className={`form-flip-card-front flex flex-col justify-between px-8 py-8 shadow-sm transition-shadow hover:shadow-md ${
+                          isPartner
+                            ? "bg-gradient-to-br from-[#ECFDF5] to-[#A7F3D0]"
+                            : "bg-gradient-to-br from-[#EFF6FF] to-[#BFDBFE]"
+                        }`}
+                      >
+                        <div>
+                          <div className="mb-4 flex items-center justify-between gap-3">
+                            {purchase.schoolLogo ? (
+                              <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-white/80 ring-1 ring-black/5">
+                                <Image
+                                  src={purchase.schoolLogo}
+                                  alt=""
+                                  fill
+                                  className="object-contain p-1"
+                                />
+                              </span>
+                            ) : (
+                              <span
+                                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/80 ${
+                                  isPartner ? "text-[#0F766E]" : "text-[#007AFF]"
+                                }`}
+                              >
+                                <GraduationCap className="h-5 w-5" />
+                              </span>
+                            )}
+                            <span
+                              className={`rounded-full bg-white/70 px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                                isPartner ? "text-[#0F766E]" : "text-[#007AFF]"
+                              }`}
                             >
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">
-                                  {label}
+                              {statusLabel(purchase)}
+                            </span>
+                          </div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-black/40">
+                            {isPartner ? "Direct apply" : "University form"}
+                          </p>
+                          <h2 className="mt-1 text-xl font-bold leading-tight text-[#1E1E1E]">
+                            {purchase.schoolName || "School form"}
+                          </h2>
+                          <p className="mt-2 text-xs font-medium text-[#555555]">
+                            {purchase.programmeLevel === "postgraduate"
+                              ? "Postgraduate"
+                              : "Undergraduate"}{" "}
+                            &middot;{" "}
+                            {new Date(purchase.date).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+                        <div
+                          className={`flex items-center gap-2 ${
+                            isPartner ? "text-[#0F766E]" : "text-[#007AFF]"
+                          }`}
+                        >
+                          <MousePointerClick className="h-4 w-4" />
+                          <span className="text-xs font-bold uppercase tracking-wide">
+                            Click to view details
+                          </span>
+                        </div>
+                      </article>
+
+                      <article className="form-flip-card-back flex flex-col bg-[#0d1117] text-white shadow-xl">
+                        <div className="form-shimmer" />
+                        <div className="form-flip-card-back-scroll relative z-10 flex min-h-0 flex-1 flex-col px-6 py-6">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                            Serial &amp; PIN
+                          </p>
+                          {purchase.voucher ? (
+                            <ul className="mt-3 space-y-3">
+                              <li className="rounded-2xl border border-[#E5E7EB] bg-white p-3">
+                                <div className="mb-2 flex items-center justify-between">
+                                  <span className="text-[9px] font-bold uppercase text-[#6B7280]">
+                                    Serial
+                                  </span>
+                                  <button
+                                    type="button"
+                                    data-no-flip
+                                    onClick={(e) =>
+                                      copyToClipboard(
+                                        e,
+                                        purchase.voucher!.serial,
+                                        `${purchase.id}-serial`,
+                                      )
+                                    }
+                                    className="flex items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[9px] font-bold text-[#374151] transition hover:bg-[#E5E7EB]"
+                                  >
+                                    Copy
+                                    <Copy
+                                      className={`h-2.5 w-2.5 ${
+                                        copyingId === `${purchase.id}-serial`
+                                          ? "text-[#16A34A]"
+                                          : ""
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+                                <p className="break-all font-mono text-sm font-bold tracking-tight text-[#111827]">
+                                  {purchase.voucher.serial}
                                 </p>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    copyToClipboard(value, `${purchase.id}-${key}`)
-                                  }
-                                  className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold hover:bg-white/15"
-                                >
-                                  <Copy
-                                    className={`h-3 w-3 ${
-                                      copyingId === `${purchase.id}-${key}`
-                                        ? "text-[#4ADE80]"
-                                        : ""
-                                    }`}
-                                  />
-                                  Copy
-                                </button>
-                              </div>
-                              <p className="mt-1 truncate font-mono text-base font-bold tracking-tight">
-                                {value}
+                                <div className="mt-2 flex items-center justify-between border-t border-[#E5E7EB] pt-2">
+                                  <span className="text-[9px] font-bold uppercase text-[#6B7280]">
+                                    PIN
+                                  </span>
+                                  <button
+                                    type="button"
+                                    data-no-flip
+                                    onClick={(e) =>
+                                      copyToClipboard(
+                                        e,
+                                        purchase.voucher!.pin,
+                                        `${purchase.id}-pin`,
+                                      )
+                                    }
+                                    className="flex items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[9px] font-bold text-[#374151] transition hover:bg-[#E5E7EB]"
+                                  >
+                                    Copy
+                                    <Copy
+                                      className={`h-2.5 w-2.5 ${
+                                        copyingId === `${purchase.id}-pin`
+                                          ? "text-[#16A34A]"
+                                          : ""
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+                                <p className="mt-0.5 font-mono text-sm font-bold tracking-widest text-[#111827]">
+                                  {purchase.voucher.pin}
+                                </p>
+                              </li>
+                            </ul>
+                          ) : (
+                            <div className="mt-4 flex flex-col items-center justify-center py-6 text-center">
+                              <Loader2 className="mb-2 h-6 w-6 animate-spin text-white/40" />
+                              <p className="text-sm font-medium text-white/60">
+                                Issuing voucher…
+                              </p>
+                              <p className="mt-2 max-w-[220px] text-[11px] leading-relaxed text-white/40">
+                                Your serial and PIN will appear here shortly. Use
+                                Get assistance if you need help.
                               </p>
                             </div>
-                          ))}
+                          )}
+
+                          {isPartner && purchase.voucher ? (
+                            <button
+                              type="button"
+                              data-no-flip
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void openPartnerApplication(purchase);
+                              }}
+                              disabled={openingId === purchase.id}
+                              className="relative z-10 mt-4 inline-flex items-center justify-center gap-1.5 rounded-full bg-[#007AFF] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0062CC] disabled:opacity-60"
+                            >
+                              {openingId === purchase.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              )}
+                              Open application
+                            </button>
+                          ) : null}
+
+                          <p className="mt-auto pt-4 text-center text-[10px] font-medium italic text-white/40">
+                            Tap to flip back
+                          </p>
                         </div>
-                      ) : null}
-
-                      {!purchase.voucher && purchase.status === "pending" ? (
-                        <p className="rounded-2xl bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E]">
-                          Your voucher is being prepared. Use Get assistance if you
-                          need help.
-                        </p>
-                      ) : null}
-
-                      <div className="mt-auto grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {purchase.voucher ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setOpenVoucherId((id) =>
-                                id === purchase.id ? null : purchase.id,
-                              )
-                            }
-                            className="inline-flex items-center justify-center gap-1.5 rounded-full border border-[#E2E8F0] bg-white px-4 py-2.5 text-xs font-semibold text-[#334155] hover:bg-[#F8FAFC]"
-                          >
-                            <KeyRound className="h-3.5 w-3.5" />
-                            {voucherOpen ? "Hide serial & PIN" : "Serial & PIN"}
-                          </button>
-                        ) : (
-                          <span className="hidden sm:block" />
-                        )}
-                        {purchase.type === "partner_voucher" && purchase.voucher ? (
-                          <button
-                            type="button"
-                            onClick={() => void openPartnerApplication(purchase)}
-                            disabled={openingId === purchase.id}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#007AFF] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0062CC] disabled:opacity-60"
-                          >
-                            {openingId === purchase.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            )}
-                            Open application
-                          </button>
-                        ) : null}
-                      </div>
+                      </article>
                     </div>
-                  </article>
+                  </div>
                 );
               })}
             </div>
-          </section>
         </div>
       )}
     </>

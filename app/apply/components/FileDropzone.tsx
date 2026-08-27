@@ -10,9 +10,18 @@ type Props = {
   maxMb: number;
   value?: string;
   error?: string;
+  preview?: "photo" | "file";
   onUploaded: (url: string) => void;
   onClear: () => void;
 };
+
+function isImageUrl(url: string) {
+  if (!url) return false;
+  if (url.startsWith("data:image/")) return true;
+  if (/\.pdf(\?|#|$)/i.test(url) || url.includes("/raw/upload/")) return false;
+  if (/\/image\/upload\//.test(url)) return true;
+  return /\.(jpe?g|png|gif|webp|avif)(\?|#|$)/i.test(url);
+}
 
 export function FileDropzone({
   label,
@@ -21,6 +30,7 @@ export function FileDropzone({
   maxMb,
   value,
   error,
+  preview = "file",
   onUploaded,
   onClear,
 }: Props) {
@@ -93,22 +103,47 @@ export function FileDropzone({
         }`}
       >
         {value ? (
-          <div className="flex items-center justify-between gap-3 text-left">
-            <a
-              href={value}
-              target="_blank"
-              rel="noreferrer"
-              className="truncate text-sm text-[var(--school-brand,#007AFF)] underline"
-            >
-              Uploaded file ✓
-            </a>
-            <button
-              type="button"
-              onClick={onClear}
-              className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-[#64748B]"
-            >
-              <X className="h-3 w-3" /> Remove
-            </button>
+          <div className="space-y-3">
+            {preview === "photo" || isImageUrl(value) ? (
+              <div
+                className={`mx-auto overflow-hidden border border-[#111827] bg-white ${
+                  preview === "photo"
+                    ? "h-40 w-32"
+                    : "h-28 w-full max-w-[220px] rounded-xl"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={value}
+                  alt={label}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : null}
+            <div className="flex items-center justify-center gap-2">
+              <a
+                href={value}
+                target="_blank"
+                rel="noreferrer"
+                className="truncate text-sm text-[var(--school-brand,#007AFF)] underline"
+              >
+                {isImageUrl(value) ? "View photo" : "Uploaded file ✓"}
+              </a>
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium text-[#334155]"
+              >
+                Replace
+              </button>
+              <button
+                type="button"
+                onClick={onClear}
+                className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-[#64748B]"
+              >
+                <X className="h-3 w-3" /> Remove
+              </button>
+            </div>
           </div>
         ) : (
           <button

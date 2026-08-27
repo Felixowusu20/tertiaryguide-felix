@@ -69,6 +69,9 @@ export function AdminExploreSection() {
   const [isSponsored, setIsSponsored] = useState(false);
   const [media, setMedia] = useState<ExploreMedia[]>([]);
   const [featuredSchoolId, setFeaturedSchoolId] = useState("");
+  const [advertiserName, setAdvertiserName] = useState("");
+  const [advertiserEmail, setAdvertiserEmail] = useState("");
+  const [campaignName, setCampaignName] = useState("");
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -140,6 +143,9 @@ export function AdminExploreSection() {
     setIsSponsored(false);
     setMedia([]);
     setFeaturedSchoolId("");
+    setAdvertiserName("");
+    setAdvertiserEmail("");
+    setCampaignName("");
     setSaveError(null);
   }
 
@@ -183,6 +189,9 @@ export function AdminExploreSection() {
           media,
           status,
           isSponsored,
+          advertiserName,
+          advertiserEmail,
+          campaignName,
           featuredSchool: school
             ? {
                 id: school.id,
@@ -422,6 +431,41 @@ export function AdminExploreSection() {
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block space-y-1 text-sm">
+                  <span className="font-medium text-[#374151]">
+                    Advertiser name
+                  </span>
+                  <input
+                    value={advertiserName}
+                    onChange={(e) => setAdvertiserName(e.target.value)}
+                    className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2.5 outline-none focus:border-[#007AFF]"
+                    placeholder="Optional"
+                  />
+                </label>
+                <label className="block space-y-1 text-sm">
+                  <span className="font-medium text-[#374151]">
+                    Advertiser email
+                  </span>
+                  <input
+                    type="email"
+                    value={advertiserEmail}
+                    onChange={(e) => setAdvertiserEmail(e.target.value)}
+                    className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2.5 outline-none focus:border-[#007AFF]"
+                    placeholder="For performance reports"
+                  />
+                </label>
+              </div>
+              <label className="block space-y-1 text-sm">
+                <span className="font-medium text-[#374151]">Campaign name</span>
+                <input
+                  value={campaignName}
+                  onChange={(e) => setCampaignName(e.target.value)}
+                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2.5 outline-none focus:border-[#007AFF]"
+                  placeholder="Optional"
+                />
               </label>
 
               <div className="space-y-2">

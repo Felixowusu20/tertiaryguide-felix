@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, BadgeCheck, Loader2, Building2 } from "lucide-react";
+import { Search, BadgeCheck, Loader2 } from "lucide-react";
 import { Header } from "../components/Header";
 import { FaqSection } from "../components/FaqSection";
 import { Footer } from "../components/Footer";
@@ -43,7 +43,10 @@ function formatDeadline(deadline: string | null): string {
 }
 
 const requestFieldClass =
-  "w-full min-h-[48px] rounded-xl bg-gray-100 px-4 py-3 text-base text-[#1E1E1E] outline-none transition placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-[#007AFF]/20 sm:min-h-0 sm:py-2.5 sm:text-sm";
+  "w-full min-h-[48px] rounded-xl border-2 border-[#94A3B8] bg-white px-4 py-3 text-base text-[#0F172A] outline-none transition placeholder:text-[#64748B] hover:border-[#64748B] focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/25 sm:min-h-11 sm:py-2.5 sm:text-sm";
+
+const requestLabelClass =
+  "mb-1.5 block text-sm font-medium text-[#334155]";
 
 export default function UniversityFormsPage() {
   const [query, setQuery] = useState("");
@@ -151,10 +154,10 @@ export default function UniversityFormsPage() {
 
   return (
     <div className="min-h-screen bg-white text-[#1E1E1E]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pb-8 pt-3 sm:gap-8 sm:px-6 sm:py-4 md:px-10 md:py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-8 sm:px-6 md:gap-5 md:px-10 md:pb-10">
         <Header />
 
-        <main className="mt-6 space-y-8 min-[360px]:mt-8 sm:mt-10 sm:space-y-10 md:mt-16">
+        <main className="space-y-8 sm:space-y-10">
           <section className="flex flex-col gap-4 sm:gap-6 md:flex-row md:items-center md:justify-between">
             <h1 className="max-w-[min(100%,24rem)] text-balance text-2xl font-semibold leading-tight min-[400px]:text-3xl md:max-w-xl md:text-4xl">
               Get a form to your <br className="max-[380px]:hidden" />
@@ -279,27 +282,18 @@ export default function UniversityFormsPage() {
           </section>
 
           <section className="border-t border-gray-100 pt-8 pb-4 sm:pt-10 md:pt-12">
-            <div className="mx-auto max-w-xl px-0 sm:px-0">
-              <div className="mb-5 flex items-start gap-3 sm:mb-6">
-                <Building2
-                  className="mt-0.5 h-5 w-5 shrink-0 text-[#007AFF]"
-                  aria-hidden
-                />
-                <div className="min-w-0">
-                  <h2 className="text-balance text-lg font-semibold leading-snug text-[#1E1E1E] min-[400px]:text-xl">
-                    Still can&apos;t find the institution you&apos;re looking for?
-                  </h2>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-600 min-[400px]:mt-1.5">
-                    Browse the schools listed above first. If yours is not
-                    listed, request it here and we&apos;ll review adding it
-                    when we can.
-                  </p>
-                </div>
-              </div>
+            <div className="mx-auto max-w-3xl">
+              <h2 className="text-balance text-lg font-semibold leading-snug text-[#1E1E1E] min-[400px]:text-xl">
+                Still can&apos;t find the institution you&apos;re looking for?
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#475569]">
+                Browse the schools listed above first. If yours is not listed,
+                request it here and we&apos;ll review adding it when we can.
+              </p>
 
               {requestSuccess ? (
-                <div className="space-y-3" role="status">
-                  <div className="rounded-xl bg-gray-100 px-4 py-3 text-sm text-gray-800">
+                <div className="mt-6 space-y-3" role="status">
+                  <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-sm text-[#166534]">
                     Thanks! We&apos;ve received your request. If you left
                     contact details, we may reach out when this institution is
                     available on TertiaryGuide.
@@ -316,7 +310,10 @@ export default function UniversityFormsPage() {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleRequestInstitution} className="space-y-4">
+                <form
+                  onSubmit={handleRequestInstitution}
+                  className="mt-6 grid gap-4 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 sm:grid-cols-2 sm:gap-5 sm:p-6"
+                >
                   <input
                     type="text"
                     name="company"
@@ -328,10 +325,7 @@ export default function UniversityFormsPage() {
                     aria-hidden="true"
                   />
                   <div>
-                    <label
-                      htmlFor="req-name"
-                      className="mb-1.5 block text-sm font-medium text-gray-600 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-wide"
-                    >
+                    <label htmlFor="req-name" className={requestLabelClass}>
                       Your full name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -346,48 +340,8 @@ export default function UniversityFormsPage() {
                       placeholder="e.g. Ama Serwaa"
                     />
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label
-                        htmlFor="req-email"
-                        className="mb-1.5 block text-sm font-medium text-gray-600 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-wide"
-                      >
-                        Email
-                      </label>
-                      <input
-                        id="req-email"
-                        type="email"
-                        value={requestEmail}
-                        onChange={(e) => setRequestEmail(e.target.value)}
-                        autoComplete="email"
-                        className={requestFieldClass}
-                        placeholder="you@example.com (optional)"
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="req-phone"
-                        className="mb-1.5 block text-sm font-medium text-gray-600 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-wide"
-                      >
-                        Phone
-                      </label>
-                      <input
-                        id="req-phone"
-                        type="tel"
-                        value={requestPhone}
-                        onChange={(e) => setRequestPhone(e.target.value)}
-                        autoComplete="tel"
-                        maxLength={30}
-                        className={requestFieldClass}
-                        placeholder="Optional"
-                      />
-                    </div>
-                  </div>
                   <div>
-                    <label
-                      htmlFor="req-inst"
-                      className="mb-1.5 block text-sm font-medium text-gray-600 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-wide"
-                    >
+                    <label htmlFor="req-inst" className={requestLabelClass}>
                       School or institution you want{" "}
                       <span className="text-red-500">*</span>
                     </label>
@@ -403,10 +357,36 @@ export default function UniversityFormsPage() {
                     />
                   </div>
                   <div>
-                    <label
-                      htmlFor="req-msg"
-                      className="mb-1.5 block text-sm font-medium text-gray-600 sm:text-xs sm:font-semibold sm:uppercase sm:tracking-wide"
-                    >
+                    <label htmlFor="req-email" className={requestLabelClass}>
+                      Email
+                    </label>
+                    <input
+                      id="req-email"
+                      type="email"
+                      value={requestEmail}
+                      onChange={(e) => setRequestEmail(e.target.value)}
+                      autoComplete="email"
+                      className={requestFieldClass}
+                      placeholder="you@example.com (optional)"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="req-phone" className={requestLabelClass}>
+                      Phone
+                    </label>
+                    <input
+                      id="req-phone"
+                      type="tel"
+                      value={requestPhone}
+                      onChange={(e) => setRequestPhone(e.target.value)}
+                      autoComplete="tel"
+                      maxLength={30}
+                      className={requestFieldClass}
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="req-msg" className={requestLabelClass}>
                       Additional details
                     </label>
                     <textarea
@@ -414,33 +394,38 @@ export default function UniversityFormsPage() {
                       value={requestMessage}
                       onChange={(e) => setRequestMessage(e.target.value)}
                       maxLength={2000}
-                      rows={3}
-                      className={`${requestFieldClass} resize-y min-h-[5.5rem]`}
+                      rows={4}
+                      className={`${requestFieldClass} min-h-[6.5rem] resize-y`}
                       placeholder="Programme type, level, or anything else that helps (optional)"
                     />
                   </div>
-                  {requestError && (
-                    <p className="text-sm text-red-600" role="alert">
+                  {requestError ? (
+                    <p
+                      className="text-sm text-red-600 sm:col-span-2"
+                      role="alert"
+                    >
                       {requestError}
                     </p>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={requestSubmitting}
-                    className="inline-flex w-full min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[#007AFF] px-5 py-3 text-base font-semibold text-white shadow-sm transition [touch-action:manipulation] hover:bg-[#0066D6] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100 sm:min-h-0 sm:w-auto sm:text-sm"
-                  >
-                    {requestSubmitting ? (
-                      <>
-                        <Loader2
-                          className="h-4 w-4 shrink-0 animate-spin"
-                          aria-hidden
-                        />
-                        Sending…
-                      </>
-                    ) : (
-                      "Send request"
-                    )}
-                  </button>
+                  ) : null}
+                  <div className="sm:col-span-2">
+                    <button
+                      type="submit"
+                      disabled={requestSubmitting}
+                      className="inline-flex w-full min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[#007AFF] px-5 py-3 text-base font-semibold text-white shadow-sm transition [touch-action:manipulation] hover:bg-[#0066D6] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100 sm:min-h-0 sm:w-auto sm:text-sm"
+                    >
+                      {requestSubmitting ? (
+                        <>
+                          <Loader2
+                            className="h-4 w-4 shrink-0 animate-spin"
+                            aria-hidden
+                          />
+                          Sending…
+                        </>
+                      ) : (
+                        "Send request"
+                      )}
+                    </button>
+                  </div>
                 </form>
               )}
             </div>
