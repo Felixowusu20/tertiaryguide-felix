@@ -81,6 +81,8 @@ export const SHS_PROGRAMMES = [
 export const EXAM_TYPES = [
   "WASSCE",
   "SSSCE",
+  "GBCE",
+  "ABCE",
   "IGCSE",
   "GCE",
   "NABPTEX",

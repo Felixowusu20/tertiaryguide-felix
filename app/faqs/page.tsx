@@ -20,7 +20,7 @@ export default function FaqsPage() {
 
     return (
         <div className="min-h-screen bg-[#FFFFFF]">
-            <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-3 sm:gap-6 sm:px-6 sm:py-4 md:gap-8 md:px-10 md:py-8">
+            <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-8 sm:px-6 md:gap-5 md:px-10 md:pb-10">
                 <Header />
 
                 <FaqHero

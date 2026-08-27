@@ -101,13 +101,12 @@ export default function DashboardLayout({
     | { label: string; logout: true; danger?: boolean };
 
   const navItems: NavItem[] = [
-    { label: "Personal Info", href: "/dashboard/personal-info" },
+    { label: "Profile", href: "/dashboard/personal-info" },
     { label: "My Forms", href: "/dashboard/my-forms" },
+    { label: "My Applications", href: "/dashboard/my-applications" },
     { label: "Assistance", href: "/dashboard/assistance" },
-    { label: "My checkers", href: "/dashboard/my-checkers" },
-    { label: "Password", href: "/dashboard/password" },
     { label: "Notifications", href: "/dashboard/notification" },
-    { label: "Delete Account", href: "/dashboard/delete", danger: true },
+    { label: "Password", href: "/dashboard/password" },
     { label: "Logout", logout: true, danger: true },
   ];
 
@@ -124,10 +123,10 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-[#1E1E1E]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-4 sm:px-6 md:gap-8 md:px-10 md:py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-8 sm:px-6 md:gap-5 md:px-10 md:pb-10">
         <Header showUserControls />
 
-        <main className="mt-2 flex flex-col gap-6 md:mt-4 md:gap-8">
+        <main className="flex flex-col gap-6 md:gap-8">
           {/* Profile */}
           <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white px-4 py-4 shadow-sm sm:px-5">
             {!isLoaded && !avatar ? (
@@ -212,7 +211,14 @@ export default function DashboardLayout({
             </div>
           </nav>
 
-          <section className="min-w-0 flex-1 space-y-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6 md:p-8">
+          <section
+            className={
+              pathname === "/dashboard/my-forms" ||
+              pathname === "/dashboard/my-applications"
+                ? "min-w-0 flex-1"
+                : "min-w-0 flex-1 space-y-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6 md:p-8"
+            }
+          >
             {children}
           </section>
         </main>

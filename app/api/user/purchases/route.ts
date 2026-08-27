@@ -142,6 +142,12 @@ export async function GET(req: NextRequest) {
           alias: s.alias ?? null,
           logo: s.logoSrc ?? null,
           slug: s.slug ?? null,
+          deadline: s.deadline ? new Date(s.deadline).toISOString() : null,
+          brandColor: s.brandColor ?? null,
+          brandColors: Array.isArray(s.brandColors) ? s.brandColors : null,
+          phone: s.phone ?? null,
+          email: s.email ?? null,
+          address: s.address ?? null,
         },
       ]),
     );
@@ -175,6 +181,12 @@ export async function GET(req: NextRequest) {
         alias: null,
         logo: null,
         slug: null,
+        deadline: null,
+        brandColor: null,
+        brandColors: null,
+        phone: null,
+        email: null,
+        address: null,
       };
       const payment = v._id ? paymentByVoucherId.get(v._id.toHexString()) : null;
       const application = v._id
@@ -194,6 +206,12 @@ export async function GET(req: NextRequest) {
         schoolFullName: schoolInfo.name,
         schoolLogo: schoolInfo.logo,
         schoolSlug: schoolInfo.slug,
+        deadline: schoolInfo.deadline ?? null,
+        schoolBrandColor: schoolInfo.brandColor ?? null,
+        schoolBrandColors: schoolInfo.brandColors ?? null,
+        schoolPhone: schoolInfo.phone ?? null,
+        schoolEmail: schoolInfo.email ?? null,
+        schoolAddress: schoolInfo.address ?? null,
         date,
         voucher: {
           serial: v.serialNumber,
@@ -202,15 +220,20 @@ export async function GET(req: NextRequest) {
         programmeLevel: v.programmeLevel ?? "undergraduate",
         status: v.isUsed || v.status === "used" ? "used" : "issued",
         application: application
-          ? {
-              id: String(application._id),
-              applicationNumber: application.applicationNumber,
-              status: application.status,
-              submittedAt: application.submittedAt?.toISOString?.()
-                ? application.submittedAt.toISOString()
-                : null,
-              detail: serializeApplication(application),
-            }
+          ? (() => {
+              const detail = serializeApplication(application);
+              return {
+                id: String(application._id),
+                applicationNumber: application.applicationNumber || detail.applicationNumber,
+                status: application.status,
+                submittedAt: application.submittedAt?.toISOString?.()
+                  ? application.submittedAt.toISOString()
+                  : null,
+                programmes: detail.programmes,
+                programme: detail.programme,
+                detail,
+              };
+            })()
           : null,
       };
     });
@@ -224,6 +247,12 @@ export async function GET(req: NextRequest) {
           alias: null,
           logo: null,
           slug: null,
+          deadline: null,
+          brandColor: null,
+          brandColors: null,
+          phone: null,
+          email: null,
+          address: null,
         };
         return {
           id: `pending-${p._id}`,
@@ -233,6 +262,12 @@ export async function GET(req: NextRequest) {
           schoolFullName: schoolInfo.name,
           schoolLogo: schoolInfo.logo,
           schoolSlug: schoolInfo.slug,
+          deadline: schoolInfo.deadline ?? null,
+          schoolBrandColor: schoolInfo.brandColor ?? null,
+          schoolBrandColors: schoolInfo.brandColors ?? null,
+          schoolPhone: schoolInfo.phone ?? null,
+          schoolEmail: schoolInfo.email ?? null,
+          schoolAddress: schoolInfo.address ?? null,
           date: p.paidAt || p.createdAt,
           voucher: null as { serial: string; pin: string } | null,
           programmeLevel: p.programmeLevel ?? "undergraduate",
@@ -241,11 +276,95 @@ export async function GET(req: NextRequest) {
         };
       });
 
+    const linkedAppIds = new Set(
+      [...partnerApps, ...Array.from(appByVoucherId.values())].map((a) =>
+        String(a._id),
+      ),
+    );
+    const emailApps = await applicationsCollection(db)
+      .find({
+        $or: [{ applicantEmail: email }, { "personalInfo.email": email }],
+      })
+      .toArray();
+    const standaloneApps = emailApps.filter(
+      (app) => !linkedAppIds.has(String(app._id)),
+    );
+    const standaloneSchoolIds = standaloneApps
+      .map((app) => app.schoolId)
+      .filter((id): id is ObjectId => Boolean(id));
+    const standaloneSchools =
+      standaloneSchoolIds.length > 0
+        ? await db
+            .collection("schools")
+            .find({ _id: { $in: standaloneSchoolIds } })
+            .toArray()
+        : [];
+    for (const school of standaloneSchools) {
+      partnerSchoolMap[school._id.toString()] = {
+        name: school.name,
+        alias: school.alias ?? null,
+        logo: school.logoSrc ?? null,
+        slug: school.slug ?? null,
+        deadline: school.deadline ? new Date(school.deadline).toISOString() : null,
+        brandColor: school.brandColor ?? null,
+        brandColors: Array.isArray(school.brandColors) ? school.brandColors : null,
+        phone: school.phone ?? null,
+        email: school.email ?? null,
+        address: school.address ?? null,
+      };
+    }
+    const standalonePartner = standaloneApps.map((application) => {
+      const schoolInfo = partnerSchoolMap[String(application.schoolId)] || {
+        name: "Unknown School",
+        alias: null,
+        logo: null,
+        slug: null,
+        deadline: null,
+        brandColor: null,
+        brandColors: null,
+        phone: null,
+        email: null,
+        address: null,
+      };
+      const detail = serializeApplication(application);
+      return {
+        id: `app-${String(application._id)}`,
+        type: "partner_voucher" as const,
+        schoolId: String(application.schoolId),
+        schoolName: schoolInfo.alias?.trim() || schoolInfo.name,
+        schoolFullName: schoolInfo.name,
+        schoolLogo: schoolInfo.logo,
+        schoolSlug: schoolInfo.slug,
+        deadline: schoolInfo.deadline ?? null,
+        schoolBrandColor: schoolInfo.brandColor ?? null,
+        schoolBrandColors: schoolInfo.brandColors ?? null,
+        schoolPhone: schoolInfo.phone ?? null,
+        schoolEmail: schoolInfo.email ?? null,
+        schoolAddress: schoolInfo.address ?? null,
+        date: application.submittedAt || application.updatedAt || new Date(),
+        voucher: null as { serial: string; pin: string } | null,
+        programmeLevel: "undergraduate" as const,
+        status: "used" as const,
+        application: {
+          id: String(application._id),
+          applicationNumber: application.applicationNumber || detail.applicationNumber,
+          status: application.status,
+          submittedAt: application.submittedAt?.toISOString?.()
+            ? application.submittedAt.toISOString()
+            : null,
+          programmes: detail.programmes,
+          programme: detail.programme,
+          detail,
+        },
+      };
+    });
+
     const allPurchases = [
       ...enrichedFormPayments,
       ...enrichedWasscePayments,
       ...enrichedPartner,
       ...pendingPartner,
+      ...standalonePartner,
     ].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
     );

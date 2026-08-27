@@ -32,6 +32,13 @@ import {
   blendBrandColors,
 } from "@/lib/brand-theme";
 import { isDeadlineCalendarExpired } from "@/lib/deadlines";
+import { ApplicationDocuments } from "../../components/ApplicationDocuments";
+import {
+  ApplicationPrintout,
+  downloadApplicationPrintout,
+  printoutFromDetail,
+} from "../../components/ApplicationPrintout";
+import type { RankedProgrammeChoice } from "@/lib/admissions/programme-choices";
 import { ProgrammesSection } from "./ProgrammesSection";
 import { BlogSection } from "./BlogSection";
 import { SettingsSection } from "./SettingsSection";
@@ -67,9 +74,18 @@ type ApplicationRow = {
   programme: string | null;
   status: string;
   submittedAt: string;
-  personalInfo?: Record<string, unknown>;
-  guardianInfo?: Record<string, unknown> | null;
-  programmeChoices?: Record<string, unknown> | null;
+  personalInfo?: Record<string, string | undefined> | null;
+  guardianInfo?: Record<string, string | undefined> | null;
+  programmeChoices?: Record<string, string | undefined> | null;
+  programmes?: RankedProgrammeChoice[];
+  educationalBackground?: Record<string, string | undefined>[];
+  examinationInfo?: Record<string, string | undefined> | null;
+  additionalExaminations?: Record<string, string | undefined>[] | null;
+  examinationSittings?: Array<
+    Record<string, string | undefined> & {
+      results?: { subject: string; grade: string }[];
+    }
+  > | null;
   results?: { subject: string; grade: string }[];
   documents?: Record<string, string | undefined> | null;
 };
@@ -138,6 +154,9 @@ function SchoolAdminPortalContent() {
   const [schoolDescription, setSchoolDescription] = useState<string | null>(
     null,
   );
+  const [schoolPhone, setSchoolPhone] = useState<string | null>(null);
+  const [schoolEmail, setSchoolEmail] = useState<string | null>(null);
+  const [schoolAddress, setSchoolAddress] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -152,6 +171,8 @@ function SchoolAdminPortalContent() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [actorLabel, setActorLabel] = useState("");
 
   useEffect(() => {
@@ -214,6 +235,9 @@ function SchoolAdminPortalContent() {
           : null,
       );
       setSchoolDescription(data.school?.description ?? null);
+      setSchoolPhone(data.school?.phone ?? null);
+      setSchoolEmail(data.school?.email ?? null);
+      setSchoolAddress(data.school?.address ?? null);
       setMetrics(data.metrics);
       setActorLabel(
         data.actor?.kind === "staff"
@@ -301,6 +325,13 @@ function SchoolAdminPortalContent() {
   }, [searchParams, applications]);
 
   const updateStatus = async (id: string, status: string) => {
+    if (status === "Rejected") {
+      const ok = window.confirm(
+        "Send this student a kind update that a place isn’t available this round? They will receive an email and see a supportive message in their portal.",
+      );
+      if (!ok) return;
+    }
+    setStatusNotice(null);
     const res = await adminFetch(`/api/school-portal/${slug}/applications/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -315,20 +346,33 @@ function SchoolAdminPortalContent() {
         prev?.id === id ? { ...prev, ...data.application } : prev,
       );
       void loadDashboard();
+      setStatusNotice(
+        data.emailed
+          ? "Status saved. The student has been emailed and will see this update in their portal."
+          : "Status saved. It will show on the student’s portal.",
+      );
+    } else {
+      setError(data.error || "Could not update status");
     }
   };
 
+  const printoutSchool = {
+    name: schoolName,
+    logoSrc: schoolLogo,
+    brandColor,
+    brandColors,
+    phone: schoolPhone,
+    email: schoolEmail,
+    address: schoolAddress,
+  };
+
   const downloadSelected = () => {
-    if (!selected) return;
-    const blob = new Blob([JSON.stringify(selected, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${selected.applicationNumber}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (!selected || downloadingPdf) return;
+    setDownloadingPdf(true);
+    void downloadApplicationPrintout({
+      school: printoutSchool,
+      data: printoutFromDetail(selected, selected.programmes),
+    }).finally(() => setDownloadingPdf(false));
   };
 
   const metricCards = useMemo(() => {
@@ -413,7 +457,7 @@ function SchoolAdminPortalContent() {
 
   return (
     <main
-      className="min-h-screen bg-[#F3F4F6] px-4 py-4 text-[#050816] sm:px-6 sm:py-6"
+      className="min-h-screen bg-[#F3F4F6] px-4 py-4 text-[#050816] sm:px-6"
       style={themeStyle}
     >
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -760,43 +804,39 @@ function SchoolAdminPortalContent() {
             className="fixed inset-0 z-40 bg-black/40"
             onClick={() => setSelected(null)}
           />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b px-5 py-4">
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-4xl flex-col bg-[#F8FAFC] shadow-xl">
+            <div className="flex items-center justify-between border-b bg-white px-5 py-4">
               <div>
                 <h2 className="font-semibold">{selected.fullName}</h2>
-                <p className="text-xs text-[#6B7280]">{selected.applicationNumber}</p>
+                <p className="text-xs text-[#6B7280]">
+                  {selected.applicationNumber} · {selected.status}
+                </p>
               </div>
               <button type="button" onClick={() => setSelected(null)}>
                 <XCircle className="h-5 w-5 text-[#9CA3AF]" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-5 py-4 text-sm space-y-4">
-              <p>
-                <strong>Status:</strong> {selected.status}
-              </p>
-              <p>
-                <strong>Email:</strong> {selected.email}
-              </p>
-              <p>
-                <strong>Phone:</strong> {selected.phone || "—"}
-              </p>
-              <p>
-                <strong>Programme:</strong> {selected.programme || "—"}
-              </p>
-              {selected.results && selected.results.length > 0 && (
-                <div>
-                  <strong>Results</strong>
-                  <ul className="mt-1 space-y-1">
-                    {selected.results.map((r, i) => (
-                      <li key={`${r.subject}-${i}`}>
-                        {r.subject}: {r.grade}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+            <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
+              {statusNotice ? (
+                <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  {statusNotice}
+                </p>
+              ) : null}
+              <ApplicationPrintout
+                school={printoutSchool}
+                data={printoutFromDetail(selected, selected.programmes)}
+              />
+              <div className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-4">
+                <ApplicationDocuments
+                  documents={selected.documents}
+                  applicationNumber={selected.applicationNumber}
+                />
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2 border-t px-5 py-4">
+            <div className="flex flex-wrap gap-2 border-t bg-white px-5 py-4">
+              <p className="mb-1 w-full text-[11px] text-[#6B7280]">
+                Changing status emails the student and updates their portal.
+              </p>
               <button
                 type="button"
                 onClick={() => void updateStatus(selected.id, "Under Review")}
@@ -827,10 +867,16 @@ function SchoolAdminPortalContent() {
               </button>
               <button
                 type="button"
+                disabled={downloadingPdf}
                 onClick={downloadSelected}
-                className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs"
+                className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs disabled:opacity-60"
               >
-                <Download className="h-3.5 w-3.5" /> Download
+                {downloadingPdf ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                {downloadingPdf ? "Preparing PDF…" : "Download PDF"}
               </button>
             </div>
           </div>

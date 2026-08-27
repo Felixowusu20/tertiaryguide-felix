@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BadgeCheck, ArrowRight } from "lucide-react";
+import { programmeCompareHref } from "@/lib/school-links";
 
 export function FindCompareCoursesSection() {
   const router = useRouter();
@@ -117,13 +118,7 @@ export function FindCompareCoursesSection() {
                 ) : (
                   <>
                     {results.map((item, index) => {
-                      const href =
-                        (item.source === "partner" || item.school?.isPartner) &&
-                        item.school?.slug
-                          ? `/apply/school/${encodeURIComponent(item.school.slug)}`
-                          : `/program-search/compare?programmeId=${encodeURIComponent(item.id)}${
-                              item.source === "partner" ? "&source=partner" : ""
-                            }`;
+                      const href = programmeCompareHref(item);
 
                       return (
                       <Link

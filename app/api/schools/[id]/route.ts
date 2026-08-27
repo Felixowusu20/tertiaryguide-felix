@@ -22,6 +22,9 @@ interface SchoolDoc {
   preRequisite?: string | null;
   durationYears?: number | null;
   isVerified?: boolean;
+  isPartner?: boolean;
+  isActive?: boolean;
+  slug?: string | null;
   category?: string | null;
   categories?: string[] | null;
 }
@@ -43,11 +46,15 @@ export async function GET(
     if (!doc) {
       return NextResponse.json({ error: "School not found" }, { status: 404 });
     }
+    if (doc.isPartner === true && doc.isActive === false) {
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
+    }
 
     const categories = normalizeSchoolCategories(
       doc.categories,
       doc.category,
     );
+    const isPartner = doc.isPartner === true;
 
     return NextResponse.json(
       {
@@ -56,6 +63,7 @@ export async function GET(
           id: String(doc._id),
           name: doc.name,
           alias: doc.alias ?? null,
+          slug: doc.slug ?? null,
           logoSrc: doc.logoSrc ?? null,
           logoAlt: doc.logoAlt ?? null,
           priceGhs: doc.priceGhs ?? null,
@@ -67,7 +75,8 @@ export async function GET(
           about: doc.about ?? null,
           preRequisite: doc.preRequisite ?? null,
           durationYears: doc.durationYears ?? null,
-          isVerified: !!doc.isVerified,
+          isVerified: isPartner || !!doc.isVerified,
+          isPartner,
           categories,
           category: primarySchoolCategory(categories),
         },

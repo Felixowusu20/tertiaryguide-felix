@@ -1,12 +1,20 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
+import { FlyerLightbox } from "./FlyerLightbox";
 import {
   extractYouTubeVideoId,
   youtubeModalEmbedUrl,
   youtubePreviewEmbedUrl,
 } from "@/lib/adVideo";
+import {
+  pauseInViewVideo,
+  playInViewVideo,
+  useInView,
+} from "@/hooks/use-in-view";
+import { trackAdAnalytics } from "@/lib/ad-analytics-client";
 
 type Ad = {
   id: string;
@@ -58,6 +66,10 @@ export type AdsSectionProps = {
   ctaLink?: string;
 };
 
+function isTrackedAdId(id?: string) {
+  return Boolean(id && /^[a-f0-9]{24}$/i.test(id));
+}
+
 export function AdsSection({
   title,
   description,
@@ -69,8 +81,8 @@ export function AdsSection({
   const [closed, setClosed] = useState(false);
   const [dbAds, setDbAds] = useState<Ad[] | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
-  const [mediaInView, setMediaInView] = useState(false);
-  const previewContainerRef = useRef<HTMLDivElement | null>(null);
+  const [imageLightboxOpen, setImageLightboxOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const modalVideoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -79,6 +91,10 @@ export function AdsSection({
     title !== "" &&
     description != null &&
     description !== "";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (hasLegacyOverride) return;
@@ -154,15 +170,26 @@ export function AdsSection({
     [effectiveItems, index],
   );
 
+  useEffect(() => {
+    if (closed || !currentAd || !isTrackedAdId(currentAd.id)) return;
+    trackAdAnalytics({
+      kind: "ad",
+      assetId: currentAd.id,
+      type: "impression",
+      placement: "homepage",
+    });
+  }, [closed, currentAd?.id]);
+
   const youtubeId = useMemo(
     () => extractYouTubeVideoId(currentAd?.videoUrl),
     [currentAd?.videoUrl],
   );
 
-  const videoModalOpenRef = useRef(false);
-  useEffect(() => {
-    videoModalOpenRef.current = videoModalOpen;
-  }, [videoModalOpen]);
+  const { ref: previewContainerRef, inView: mediaInView } = useInView<HTMLDivElement>({
+    enabled: Boolean(!closed && currentAd?.videoUrl),
+    threshold: 0.15,
+    rootMargin: "120px 0px 120px 0px",
+  });
 
   useEffect(() => {
     setIndex(0);
@@ -170,11 +197,17 @@ export function AdsSection({
 
   const openVideoModal = useCallback(() => {
     const el = previewVideoRef.current;
-    if (el) {
-      el.pause();
-    }
+    if (el) pauseInViewVideo(el);
     setVideoModalOpen(true);
-  }, []);
+    if (isTrackedAdId(currentAd?.id)) {
+      trackAdAnalytics({
+        kind: "ad",
+        assetId: currentAd!.id,
+        type: "view",
+        placement: "homepage",
+      });
+    }
+  }, [currentAd]);
 
   const closeVideoModal = useCallback(() => {
     setVideoModalOpen(false);
@@ -182,9 +215,7 @@ export function AdsSection({
       const el = previewVideoRef.current;
       if (!el) return;
       el.muted = true;
-      el.play().catch(() => {
-        // IO will retry when in view
-      });
+      void playInViewVideo(el).catch(() => undefined);
     });
   }, []);
 
@@ -210,48 +241,35 @@ export function AdsSection({
 
   useEffect(() => {
     setVideoModalOpen(false);
+    setImageLightboxOpen(false);
   }, [index]);
 
-  // In-view flag for both YouTube (iframe src) and direct <video> preview
-  useEffect(() => {
-    if (closed || !currentAd?.videoUrl) {
-      setMediaInView(false);
-      return;
-    }
-    const el = previewContainerRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) {
-            if (!videoModalOpenRef.current) setMediaInView(true);
-          } else {
-            setMediaInView(false);
-          }
-        }
-      },
-      { threshold: 0.35, rootMargin: "0px 0px -8% 0px" },
-    );
-    obs.observe(el);
-    return () => {
-      obs.disconnect();
-    };
-  }, [closed, currentAd?.id, currentAd?.videoUrl]);
-
-  // Direct file URL: play muted in view, pause out of view
+  // Direct file URL: play muted when the ad appears / is scrolled to
   useEffect(() => {
     if (closed || !currentAd?.videoUrl || youtubeId) return;
-    if (videoModalOpen) return;
     const v = previewVideoRef.current;
-    if (!v) return;
-    if (mediaInView) {
-      v.muted = true;
-      v.play().catch(() => {
-        // ignore autoplay block
-      });
-    } else {
-      v.pause();
+    if (videoModalOpen) {
+      if (v) pauseInViewVideo(v);
+      return;
     }
+    if (!v) return;
+
+    const tryPlay = () => {
+      v.muted = true;
+      void playInViewVideo(v).catch(() => undefined);
+    };
+
+    if (mediaInView) {
+      tryPlay();
+      v.addEventListener("canplay", tryPlay);
+      v.addEventListener("loadeddata", tryPlay);
+      return () => {
+        v.removeEventListener("canplay", tryPlay);
+        v.removeEventListener("loadeddata", tryPlay);
+      };
+    }
+
+    pauseInViewVideo(v);
   }, [
     closed,
     currentAd?.id,
@@ -283,6 +301,7 @@ export function AdsSection({
   // Auto-rotate: longer when the current slide is video so it can be watched
   useEffect(() => {
     if (closed || effectiveItems.length <= 1) return;
+    if (videoModalOpen || imageLightboxOpen) return;
     const isVideo = Boolean(currentAd?.videoUrl);
     const delay = isVideo ? SLIDE_MS_VIDEO : SLIDE_MS_IMAGE;
     const t = setInterval(() => {
@@ -295,6 +314,8 @@ export function AdsSection({
     index,
     currentAd?.id,
     currentAd?.videoUrl,
+    videoModalOpen,
+    imageLightboxOpen,
   ]);
 
   const next = () => {
@@ -351,6 +372,16 @@ export function AdsSection({
 
               <a
                 href={ad.ctaLink ?? "/"}
+                onClick={() => {
+                  if (isTrackedAdId(ad.id)) {
+                    trackAdAnalytics({
+                      kind: "ad",
+                      assetId: ad.id,
+                      type: "click",
+                      placement: "homepage",
+                    });
+                  }
+                }}
                 className="inline-flex w-fit min-h-[44px] items-center justify-center rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-[#007AFF] transition hover:scale-[1.02] active:scale-[0.98]"
               >
                 {ad.ctaText}
@@ -392,7 +423,7 @@ export function AdsSection({
                         muted
                         loop
                         playsInline
-                        preload="metadata"
+                        preload={mediaInView ? "auto" : "metadata"}
                         poster={ad.imageUrl || undefined}
                       />
                     )}
@@ -403,14 +434,34 @@ export function AdsSection({
                   </span>
                 </button>
               ) : (
-                <div className="flex w-full max-w-xl items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/5 p-2 sm:p-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isTrackedAdId(ad.id)) {
+                      trackAdAnalytics({
+                        kind: "ad",
+                        assetId: ad.id,
+                        type: "view",
+                        placement: "homepage",
+                      });
+                    }
+                    setImageLightboxOpen(true);
+                  }}
+                  className="group relative flex w-full max-w-xl items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/5 p-2 text-left sm:p-3"
+                  aria-label={`View ${ad.title} flyer`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={ad.imageUrl || "/og-image.jpg"}
                     alt={ad.title}
                     className="max-h-[min(42vh,320px)] w-full object-contain object-center sm:max-h-80 md:max-h-96"
                     loading="lazy"
                   />
-                </div>
+                  <span className="pointer-events-none absolute bottom-2 right-2 z-[1] flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1.5 text-[11px] font-medium text-white/95 shadow-sm backdrop-blur-sm">
+                    <Maximize2 className="h-3.5 w-3.5 opacity-90" aria-hidden />
+                    View flyer
+                  </span>
+                </button>
               )}
             </div>
           </div>
@@ -453,7 +504,18 @@ export function AdsSection({
         </div>
       </div>
 
-      {videoModalOpen && ad.videoUrl && (
+      {imageLightboxOpen && (ad.imageUrl || "/og-image.jpg") && (
+        <FlyerLightbox
+          src={ad.imageUrl || "/og-image.jpg"}
+          alt={ad.title}
+          onClose={() => setImageLightboxOpen(false)}
+        />
+      )}
+
+      {mounted &&
+        videoModalOpen &&
+        ad.videoUrl &&
+        createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -495,8 +557,9 @@ export function AdsSection({
               />
             )}
           </div>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </section>
   );
 }

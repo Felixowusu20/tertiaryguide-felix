@@ -173,6 +173,11 @@ export type EducationalBackground = {
   region?: string;
 };
 
+export type ExamResult = {
+  subject: string;
+  grade: string;
+};
+
 export type ExaminationInfo = {
   examType?: string;
   examBody?: string;
@@ -181,11 +186,11 @@ export type ExaminationInfo = {
   indexNumber?: string;
   candidateNumber?: string;
   examinationCentre?: string;
+  institutionName?: string;
 };
 
-export type ExamResult = {
-  subject: string;
-  grade: string;
+export type ExaminationSitting = ExaminationInfo & {
+  results?: ExamResult[];
 };
 
 export type UploadedDocuments = {
@@ -199,6 +204,8 @@ export type UploadedDocuments = {
 export type ApplicationDoc = {
   _id?: ObjectId;
   applicationNumber: string;
+  /** Legacy unique key; kept in sync with applicationNumber. */
+  reference?: string;
   schoolId: ObjectId;
   applicantUserId?: ObjectId | null;
   applicantEmail: string;
@@ -209,6 +216,8 @@ export type ApplicationDoc = {
   programmeChoices?: ProgrammeChoices;
   educationalBackground?: EducationalBackground[];
   examinationInfo?: ExaminationInfo;
+  additionalExaminations?: ExaminationInfo[];
+  examinationSittings?: ExaminationSitting[];
   results?: ExamResult[];
   documents?: UploadedDocuments;
   submittedAt: Date;

@@ -7,6 +7,8 @@ import {
   applicationsCollection,
   serializeApplication,
 } from "./applications";
+import { canStudentEditApplication, deadlineToIso } from "./edit-window";
+import { isDeadlineCalendarExpired } from "../deadlines";
 
 export function admissionVouchersCollection(db: Db) {
   return db.collection<AdmissionVoucherDoc>("admissionVouchers");
@@ -184,21 +186,26 @@ export async function markVoucherUsed(opts: {
   );
 }
 
-export const EDITABLE_APPLICATION_STATUSES = [
-  "Pending",
-  "Under Review",
-] as const;
-
-export function isApplicationEditable(status: string): boolean {
-  return (EDITABLE_APPLICATION_STATUSES as readonly string[]).includes(status);
-}
+export {
+  canStudentEditApplication,
+  deadlineToIso,
+  isApplicationEditable,
+  EDITABLE_APPLICATION_STATUSES,
+} from "./edit-window";
 
 export function serializeVoucherSession(opts: {
   voucher: AdmissionVoucherDoc;
   application: Awaited<ReturnType<typeof findApplicationForVoucher>>;
-  school: { id: string; name: string; slug: string | null; brandColor?: string | null };
+  school: {
+    id: string;
+    name: string;
+    slug: string | null;
+    brandColor?: string | null;
+    deadline?: Date | string | null;
+  };
 }) {
   const { voucher, application, school } = opts;
+  const deadline = deadlineToIso(school.deadline);
   return {
     voucher: {
       id: String(voucher._id),
@@ -208,10 +215,17 @@ export function serializeVoucherSession(opts: {
       isUsed: !!voucher.isUsed,
       purchasedBy: voucher.purchasedBy ?? null,
     },
-    school,
+    school: {
+      id: school.id,
+      name: school.name,
+      slug: school.slug,
+      brandColor: school.brandColor ?? null,
+      deadline,
+    },
     application: application ? serializeApplication(application) : null,
-    canEdit: application ? isApplicationEditable(application.status) : true,
+    canEdit: canStudentEditApplication(application?.status, deadline),
     hasApplication: !!application,
+    deadlineExpired: isDeadlineCalendarExpired(deadline),
   };
 }
 

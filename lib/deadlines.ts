@@ -18,6 +18,23 @@ export function isDeadlineCalendarExpired(deadline: string | null): boolean {
   return deadlineDay.getTime() < today.getTime();
 }
 
+/** Active deadlines first (soonest first); expired dates last, still by date. */
+export function compareDeadlineForListing(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): number {
+  const aExpired = isDeadlineCalendarExpired(a ?? null);
+  const bExpired = isDeadlineCalendarExpired(b ?? null);
+  if (aExpired !== bExpired) return aExpired ? 1 : -1;
+  const aTime = a ? new Date(a).getTime() : Number.POSITIVE_INFINITY;
+  const bTime = b ? new Date(b).getTime() : Number.POSITIVE_INFINITY;
+  const aValid = Number.isFinite(aTime);
+  const bValid = Number.isFinite(bTime);
+  if (aValid !== bValid) return aValid ? -1 : 1;
+  if (aTime !== bTime) return aTime - bTime;
+  return 0;
+}
+
 /**
  * True if the deadline falls on a calendar day from `today` through `today + maxDays` (inclusive both ends).
  * Deadlines in the past (before today) are excluded.

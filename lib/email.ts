@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { absoluteUrl } from "./site-url";
+import { studentStatusCopy } from "./admissions/status-messages";
 
 const apiKey = process.env.RESEND_API_KEY;
 const fromEmailEnv = process.env.EMAIL_FROM;
@@ -693,6 +694,8 @@ export async function sendApplicationSubmittedToSchool(opts: {
   schoolName: string;
   applicationNumber: string;
   applicationUrl: string;
+  updated?: boolean;
+  pdf?: { filename: string; content: Buffer };
 }): Promise<void> {
   const {
     to,
@@ -701,38 +704,187 @@ export async function sendApplicationSubmittedToSchool(opts: {
     schoolName,
     applicationNumber,
     applicationUrl,
+    updated = false,
+    pdf,
   } = opts;
+
+  const heading = updated
+    ? `An application was updated for ${schoolName}. Please open your dashboard to review the latest details.`
+    : `You have received a new applicant at ${schoolName}. Please open your dashboard now to review this student.`;
+  const subject = updated
+    ? `Updated applicant — review ${applicantName} on your ${schoolName} dashboard`
+    : `New applicant — review ${applicantName} on your ${schoolName} dashboard`;
+  const pdfNote = pdf
+    ? "The official application summary PDF is attached. Download it to review the full printout, then open your dashboard to change the student’s status."
+    : "Open your dashboard to review this student.";
 
   const result = await resend.emails.send({
     from: FROM_EMAIL,
     to,
-    subject: `New application — ${applicantName} (${schoolName})`,
+    subject,
     text: [
-      `A new application was submitted for ${schoolName}.`,
+      "Hello,",
+      "",
+      heading,
       "",
       `Applicant: ${applicantName}`,
       `Programme: ${programme || "Not specified"}`,
       `Application Number: ${applicationNumber}`,
       "",
-      `Review: ${applicationUrl}`,
+      pdfNote,
+      `Review on dashboard: ${applicationUrl}`,
       "",
       "TertiaryGuide Admissions",
-    ].join("\n"),
+    ]
+      .filter((line, index, lines) => line !== "" || lines[index - 1] !== "")
+      .join("\n"),
     html: `
-      <div style="font-family: system-ui, sans-serif; color: #111827; padding: 24px;">
-        <p>A new application was submitted for <strong>${escapeHtml(schoolName)}</strong>.</p>
+      <div style="font-family: system-ui, sans-serif; color: #111827; padding: 24px; max-width: 560px;">
+        <p>Hello,</p>
+        <p>${escapeHtml(heading)}</p>
         <ul>
           <li><strong>Applicant:</strong> ${escapeHtml(applicantName)}</li>
           <li><strong>Programme:</strong> ${escapeHtml(programme || "Not specified")}</li>
           <li><strong>Application Number:</strong> ${escapeHtml(applicationNumber)}</li>
         </ul>
-        <p><a href="${escapeHtml(applicationUrl)}" style="color:#007AFF;">Open application</a></p>
+        ${
+          pdf
+            ? `<p>The official application summary PDF is attached. Download it to review the printout (including the passport photograph and programme choices), then use your dashboard to approve, reject, or admit the student.</p>`
+            : `<p>Open your dashboard to review this student and update their status.</p>`
+        }
+        <p style="margin: 24px 0;">
+          <a href="${escapeHtml(applicationUrl)}" style="display:inline-block;background:#007AFF;color:#ffffff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:600;">
+            Open dashboard to review
+          </a>
+        </p>
       </div>
     `,
+    attachments: pdf
+      ? [
+          {
+            filename: pdf.filename,
+            content: pdf.content.toString("base64"),
+            contentType: "application/pdf",
+          },
+        ]
+      : undefined,
   });
 
   if (result.error) {
     console.error("[sendApplicationSubmittedToSchool]", result.error);
+  }
+}
+
+export async function sendApplicationStatusUpdateToApplicant(opts: {
+  to: string;
+  applicantName: string;
+  schoolName: string;
+  applicationNumber: string;
+  status: string;
+  programme?: string | null;
+  reviewNotes?: string | null;
+}): Promise<void> {
+  const {
+    to,
+    applicantName,
+    schoolName,
+    applicationNumber,
+    status,
+    programme,
+    reviewNotes,
+  } = opts;
+  const copy = studentStatusCopy(status);
+  const portalUrl = absoluteUrl("/dashboard/my-forms");
+  const exploreUrl = absoluteUrl("/apply");
+  const firstName = applicantName.split(" ")[0] || "there";
+  const isCare = copy.tone === "care";
+  const accent = isCare ? "#B45309" : copy.tone === "success" ? "#047857" : "#007AFF";
+
+  const text = [
+    `Hello ${firstName},`,
+    "",
+    copy.title,
+    "",
+    copy.message,
+    "",
+    `School: ${schoolName}`,
+    `Application Number: ${applicationNumber}`,
+    programme ? `Programme: ${programme}` : "",
+    reviewNotes ? `Note from the school: ${reviewNotes}` : "",
+    "",
+    `View your application: ${portalUrl}`,
+    isCare ? `Explore other programmes: ${exploreUrl}` : "",
+    "",
+    "With care,",
+    "The TertiaryGuide Team",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const result = await resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: copy.emailSubject(schoolName),
+    text,
+    html: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(copy.emailSubject(schoolName))}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F3F4F6;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F3F4F6;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background-color:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #E5E7EB;">
+          <tr>
+            <td style="padding:28px 28px 8px 28px;">
+              <p style="margin:0 0 8px 0;font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${accent};">${escapeHtml(copy.badge)}</p>
+              <h1 style="margin:0;font-family:system-ui,sans-serif;font-size:22px;line-height:1.3;color:#0F172A;">${escapeHtml(copy.title)}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 8px 28px;font-family:system-ui,sans-serif;font-size:15px;line-height:1.65;color:#334155;">
+              <p style="margin:0 0 12px 0;">Hello ${escapeHtml(firstName)},</p>
+              <p style="margin:0 0 16px 0;">${escapeHtml(copy.message)}</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F8FAFC;border-radius:14px;">
+                <tr>
+                  <td style="padding:14px 16px;font-size:13px;color:#475569;">
+                    <p style="margin:0 0 6px 0;"><strong>School:</strong> ${escapeHtml(schoolName)}</p>
+                    <p style="margin:0 0 6px 0;"><strong>Application number:</strong> ${escapeHtml(applicationNumber)}</p>
+                    ${programme ? `<p style="margin:0;"><strong>Programme:</strong> ${escapeHtml(programme)}</p>` : ""}
+                  </td>
+                </tr>
+              </table>
+              ${
+                reviewNotes
+                  ? `<p style="margin:16px 0 0 0;padding:12px 14px;background:#FFFBEB;border-radius:12px;font-size:13px;"><strong>A note from the school:</strong> ${escapeHtml(reviewNotes)}</p>`
+                  : ""
+              }
+              <p style="margin:22px 0 0 0;">
+                <a href="${escapeHtml(portalUrl)}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;border-radius:999px;padding:12px 18px;font-size:14px;font-weight:600;">View your application</a>
+              </p>
+              ${
+                isCare
+                  ? `<p style="margin:12px 0 0 0;"><a href="${escapeHtml(exploreUrl)}" style="color:#007AFF;font-size:14px;">Explore other programmes</a></p>`
+                  : ""
+              }
+              <p style="margin:24px 0 0 0;font-size:13px;color:#64748B;">With care,<br/>The TertiaryGuide Team</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `,
+  });
+
+  if (result.error) {
+    throw new Error(result.error.message || "Failed to send status email");
   }
 }
 
@@ -1019,6 +1171,79 @@ export async function sendSchoolPortalInviteEmail(opts: {
     );
   }
 }
+
+export async function sendAdvertiserPerformanceEmail(opts: {
+  to: string;
+  advertiserName?: string;
+  fromLabel: string;
+  toLabel: string;
+  summaryHtml: string;
+  xlsxBuffer: Buffer;
+  filename: string;
+}): Promise<void> {
+  const { to, advertiserName, fromLabel, toLabel, summaryHtml, xlsxBuffer, filename } =
+    opts;
+  const greeting = advertiserName?.trim() || "there";
+  const subject = `Your TertiaryGuide advertising report (${fromLabel} – ${toLabel})`;
+  const text = [
+    `Hello ${greeting},`,
+    "",
+    `Please find attached your advertising performance report for ${fromLabel} to ${toLabel}.`,
+    "",
+    "This report covers impressions, views, clicks, and click-through rate for your ads and Explore posts on TertiaryGuide. It does not include personal information about people who saw the ads.",
+    "",
+    "Warm regards,",
+    "The TertiaryGuide Team",
+  ].join("\n");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:24px;background:#F8FAFC;font-family:system-ui,sans-serif;color:#0F172A;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #E2E8F0;">
+    <tr>
+      <td style="padding:24px 28px;background:#007AFF;color:#fff;">
+        <p style="margin:0;font-size:18px;font-weight:700;">TertiaryGuide</p>
+        <p style="margin:6px 0 0;font-size:13px;opacity:.9;">Advertising performance report</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px 28px;">
+        <p style="margin:0 0 12px;font-size:15px;">Hello ${escapeHtml(greeting)},</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#334155;">
+          Attached is your campaign report for <strong>${escapeHtml(fromLabel)}</strong>
+          to <strong>${escapeHtml(toLabel)}</strong>. Metrics are aggregated and do not
+          include personal data about site visitors.
+        </p>
+        ${summaryHtml}
+        <p style="margin:20px 0 0;font-size:13px;color:#64748B;">
+          Warm regards,<br />The TertiaryGuide Team
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const result = await resend.emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject,
+    text,
+    html,
+    attachments: [
+      {
+        filename,
+        content: xlsxBuffer,
+      },
+    ],
+  });
+
+  if (result.error) {
+    throw new Error(result.error.message || "Failed to send advertiser report");
+  }
+}
+
 
 
 

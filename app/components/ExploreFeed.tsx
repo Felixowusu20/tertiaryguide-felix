@@ -1,23 +1,39 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import {
+  BadgeCheck,
   Compass,
   Eye,
   Heart,
   Loader2,
   MessageCircle,
+  Play,
   SendHorizontal,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { postTypeLabel, type ExplorePostType } from "@/lib/explore/types";
+import { OptimizedImage } from "@/app/components/OptimizedImage";
+import { ResponsiveMediaImg } from "@/app/components/ResponsiveMediaImg";
+import {
+  IMAGE_SIZES,
+  SRCSET_WIDTHS,
+  imageAlt,
+} from "@/lib/cloudinary-image";
+import {
+  pauseInViewVideo,
+  playInViewVideo,
+  useInView,
+} from "@/hooks/use-in-view";
 import {
   getStoredUserEmail,
   getStoredUserName,
   signInRedirectHref,
 } from "@/lib/client-auth";
+import { trackAdAnalytics } from "@/lib/ad-analytics-client";
 
 type ExploreMedia = { type: "image" | "video"; url: string };
 
@@ -69,7 +85,193 @@ function timeAgo(iso: string) {
   });
 }
 
-export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
+type MediaShape = "portrait" | "landscape" | "square";
+
+function mediaShapeFromRatio(width: number, height: number): MediaShape {
+  if (!width || !height) return "portrait";
+  const ratio = width / height;
+  if (ratio < 0.86) return "portrait";
+  if (ratio > 1.2) return "landscape";
+  return "square";
+}
+
+function mediaFrameClass(compact: boolean, shape: MediaShape) {
+  if (compact) return "aspect-square";
+  if (shape === "landscape") return "aspect-video";
+  return "h-[min(52dvh,460px)]";
+}
+
+function ExploreVideo({
+  src,
+  compact = false,
+}: {
+  src: string;
+  compact?: boolean;
+}) {
+  const [shape, setShape] = useState<MediaShape>("portrait");
+  const [muted, setMuted] = useState(true);
+  const [userPaused, setUserPaused] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const userPausedRef = useRef(false);
+  const mutedRef = useRef(true);
+  const { ref: inViewRef, inView } = useInView<HTMLDivElement>({
+    threshold: 0.35,
+    rootMargin: "40px 0px 40px 0px",
+  });
+
+  userPausedRef.current = userPaused;
+  mutedRef.current = muted;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const tryPlay = () => {
+      if (userPausedRef.current) return;
+      video.muted = mutedRef.current;
+      void playInViewVideo(video).catch(() => {
+        video.muted = true;
+        mutedRef.current = true;
+        setMuted(true);
+        void playInViewVideo(video).catch(() => undefined);
+      });
+    };
+
+    if (inView && !userPaused) {
+      tryPlay();
+      video.addEventListener("canplay", tryPlay);
+      video.addEventListener("loadeddata", tryPlay);
+      return () => {
+        video.removeEventListener("canplay", tryPlay);
+        video.removeEventListener("loadeddata", tryPlay);
+      };
+    }
+
+    pauseInViewVideo(video);
+    if (!inView) setUserPaused(false);
+  }, [inView, userPaused, src]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) video.muted = muted;
+  }, [muted]);
+
+  function toggleMute(e: React.MouseEvent) {
+    e.stopPropagation();
+    const video = videoRef.current;
+    const next = !muted;
+    setMuted(next);
+    mutedRef.current = next;
+    if (!video) return;
+    video.muted = next;
+    if (!next && video.paused && !userPausedRef.current && inView) {
+      void playInViewVideo(video).catch(() => {
+        video.muted = true;
+        mutedRef.current = true;
+        setMuted(true);
+      });
+    }
+  }
+
+  function togglePlay() {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      userPausedRef.current = false;
+      setUserPaused(false);
+      video.muted = mutedRef.current;
+      void playInViewVideo(video).catch(() => undefined);
+    } else {
+      userPausedRef.current = true;
+      setUserPaused(true);
+      pauseInViewVideo(video);
+    }
+  }
+
+  return (
+    <div
+      ref={inViewRef}
+      className={`relative w-full overflow-hidden bg-black ${mediaFrameClass(compact, shape)}`}
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        muted
+        loop
+        playsInline
+        preload={inView ? "auto" : "metadata"}
+        onClick={togglePlay}
+        onLoadedMetadata={(e) => {
+          const video = e.currentTarget;
+          setShape(mediaShapeFromRatio(video.videoWidth, video.videoHeight));
+        }}
+        className="absolute inset-0 h-full w-full cursor-pointer object-cover object-center"
+      />
+      {userPaused && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/45 text-white shadow-lg">
+            <Play className="h-7 w-7 pl-0.5" fill="currentColor" />
+          </span>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={toggleMute}
+        className="absolute bottom-2.5 right-2.5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/70"
+        aria-label={muted ? "Unmute video" : "Mute video"}
+      >
+        {muted ? (
+          <VolumeX className="h-4 w-4" />
+        ) : (
+          <Volume2 className="h-4 w-4" />
+        )}
+      </button>
+    </div>
+  );
+}
+
+function ExploreImage({
+  src,
+  alt,
+  compact = false,
+  onOpen,
+}: {
+  src: string;
+  alt: string;
+  compact?: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`relative block w-full overflow-hidden bg-white ${
+        compact ? "aspect-square" : ""
+      }`}
+    >
+      <ResponsiveMediaImg
+        src={src}
+        alt={alt}
+        sizes={compact ? IMAGE_SIZES.exploreCompact : IMAGE_SIZES.explore}
+        widths={SRCSET_WIDTHS.feed}
+        widthHint={compact ? 480 : 800}
+        className={
+          compact
+            ? "absolute inset-0 h-full w-full object-contain object-center"
+            : "block h-auto w-full object-contain object-center"
+        }
+      />
+    </button>
+  );
+}
+
+export function ExploreFeed({
+  embedded = false,
+  variant = "tab",
+}: {
+  embedded?: boolean;
+  variant?: "tab" | "page";
+}) {
   const [posts, setPosts] = useState<ExplorePost[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -80,6 +282,9 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [commentBusy, setCommentBusy] = useState(false);
+  const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(
+    null,
+  );
   const viewedIds = useRef<Set<string>>(new Set());
   const observerRef = useRef<IntersectionObserver | null>(null);
 
@@ -122,6 +327,18 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
   const recordView = useCallback((postId: string) => {
     if (viewedIds.current.has(postId)) return;
     viewedIds.current.add(postId);
+    trackAdAnalytics({
+      kind: "explore",
+      assetId: postId,
+      type: "impression",
+      placement: "explore",
+    });
+    trackAdAnalytics({
+      kind: "explore",
+      assetId: postId,
+      type: "view",
+      placement: "explore",
+    });
     void fetch(`/api/explore/posts/${postId}/view`, { method: "POST" })
       .then((r) => r.json())
       .then((data) => {
@@ -286,8 +503,8 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
         id="explore"
         className={
           embedded
-            ? "relative scroll-mt-24"
-            : "relative mt-10 scroll-mt-24 overflow-hidden sm:mt-14 md:mt-16"
+            ? "relative scroll-mt-24 bg-[#F7F9FC] pb-0 md:bg-transparent"
+            : "relative mt-4 scroll-mt-24 overflow-hidden md:mt-5"
         }
       >
         {!embedded && (
@@ -300,7 +517,9 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
         <div
           className={
             embedded
-              ? "relative mx-auto max-w-xl px-4 sm:px-6"
+              ? variant === "page"
+                ? "relative mx-auto max-w-xl px-3 pb-4 pt-3 sm:px-4 md:max-w-none md:px-3 md:pb-5 md:pt-3"
+                : "relative mx-auto max-w-xl px-3 pb-4 pt-3 sm:px-4 sm:pt-4"
               : "relative mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12 md:px-10 md:py-14"
           }
         >
@@ -321,28 +540,50 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
           )}
 
           {embedded && (
-            <div className="mb-5 px-1 sm:mb-6">
-              <h2 className="text-xl font-semibold tracking-tight text-[#252525] sm:text-2xl">
-                Opportunities & resources
+            <div
+              className={
+                variant === "page" ? "mb-4 px-1 md:hidden" : "mb-4 px-1"
+              }
+            >
+              <h2 className="text-lg font-semibold tracking-tight text-[#252525]">
+                Latest updates
               </h2>
-              <p className="mt-1 text-sm text-[#6B7280]">
-                Updates from schools, flyers, deadlines, and partner tips
+              <p className="text-xs text-[#64748B]">
+                Flyers, deadlines, and school news
               </p>
             </div>
           )}
 
           <div className={embedded ? "" : "mx-auto mt-8 max-w-xl sm:mt-10"}>
             {loading ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-[#E8EEF5] bg-white/80 py-16 shadow-sm">
+              <div
+                className={
+                  variant === "page"
+                    ? "flex flex-col items-center justify-center gap-3 rounded-2xl bg-white py-16"
+                    : "flex flex-col items-center justify-center gap-3 rounded-3xl border border-[#E8EEF5] bg-white/80 py-16 shadow-sm"
+                }
+              >
                 <Loader2 className="h-6 w-6 animate-spin text-[#007AFF]" />
                 <p className="text-sm text-[#6B7280]">Loading updates…</p>
               </div>
             ) : error ? (
-              <div className="rounded-3xl border border-red-100 bg-red-50 px-5 py-8 text-center text-sm text-red-700">
+              <div
+                className={
+                  variant === "page"
+                    ? "rounded-2xl bg-red-50 px-5 py-8 text-center text-sm text-red-700"
+                    : "rounded-3xl border border-red-100 bg-red-50 px-5 py-8 text-center text-sm text-red-700"
+                }
+              >
                 {error}
               </div>
             ) : posts.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-[#Dbeafe] bg-white px-5 py-14 text-center shadow-sm">
+              <div
+                className={
+                  variant === "page"
+                    ? "rounded-2xl bg-white px-5 py-14 text-center"
+                    : "rounded-3xl border border-dashed border-[#Dbeafe] bg-white px-5 py-14 text-center shadow-sm"
+                }
+              >
                 <Compass className="mx-auto h-8 w-8 text-[#007AFF]/50" />
                 <p className="mt-3 text-base font-semibold text-[#1E1E1E]">
                   Nothing to explore yet
@@ -353,125 +594,142 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className={variant === "page" ? "space-y-4" : "space-y-5"}>
                 {posts.map((post) => (
                   <article
                     key={post.id}
                     ref={(node) => postNodeRef(node, post.id)}
-                    className="overflow-hidden rounded-3xl border border-[#E8EEF5] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]"
+                    className={
+                      variant === "page"
+                        ? "overflow-hidden rounded-2xl bg-white"
+                        : "overflow-hidden rounded-[28px] border border-[#E8EEF5] bg-white shadow-[0_10px_32px_rgba(15,23,42,0.05)]"
+                    }
                   >
-                    <div className="p-4 sm:p-5">
-                      <header className="flex items-start gap-3">
-                        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#EFF6FF] ring-2 ring-white shadow-sm">
-                          {post.authorAvatar ? (
-                            <Image
-                              src={post.authorAvatar}
-                              alt=""
-                              fill
-                              className="object-cover"
+                    <header className="flex items-start gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
+                      <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#EFF6FF] ring-2 ring-white shadow-sm">
+                        {post.authorAvatar ? (
+                          <OptimizedImage
+                            src={post.authorAvatar}
+                            alt=""
+                            fill
+                            sizes="44px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-sm font-bold text-[#007AFF]">
+                            {post.authorName.slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <p className="truncate text-sm font-semibold text-[#1E1E1E]">
+                            {post.authorName}
+                          </p>
+                          {post.isSponsored && (
+                            <span className="rounded-md bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#6B7280]">
+                              Sponsored
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-[12px] text-[#6B7280]">
+                          <span className="font-medium text-[#007AFF]">
+                            {postTypeLabel(post.postType)}
+                          </span>
+                          <span className="mx-1.5 text-[#D1D5DB]">·</span>
+                          {timeAgo(post.publishedAt || post.createdAt)}
+                        </p>
+                      </div>
+                    </header>
+
+                    {post.body && (
+                      <p className="mt-3 whitespace-pre-wrap px-4 text-sm leading-relaxed text-[#1E1E1E] sm:px-5">
+                        {post.body}
+                      </p>
+                    )}
+
+                    {post.media.length > 0 && (
+                      <div
+                        className={`mt-3 overflow-hidden ${
+                          post.media.length === 1
+                            ? ""
+                            : "grid grid-cols-2 gap-px bg-[#E8EEF5]"
+                        }`}
+                      >
+                        {post.media.slice(0, 4).map((m, i) =>
+                          m.type === "video" ? (
+                            <ExploreVideo
+                              key={`${post.id}-media-${i}`}
+                              src={m.url}
+                              compact={post.media.length > 1}
                             />
                           ) : (
-                            <span className="flex h-full w-full items-center justify-center text-sm font-bold text-[#007AFF]">
-                              {post.authorName.slice(0, 1).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1 pt-0.5">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <p className="truncate text-[15px] font-semibold text-[#0F1419]">
-                              {post.authorName}
-                            </p>
-                            {post.isSponsored && (
-                              <span className="rounded-md bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#6B7280]">
-                                Sponsored
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-0.5 text-[12px] text-[#6B7280]">
-                            <span className="font-medium text-[#007AFF]">
-                              {postTypeLabel(post.postType)}
-                            </span>
-                            <span className="mx-1.5 text-[#D1D5DB]">·</span>
-                            {timeAgo(post.publishedAt || post.createdAt)}
-                          </p>
-                        </div>
-                      </header>
+                            <ExploreImage
+                              key={`${post.id}-media-${i}`}
+                              src={m.url}
+                              alt={imageAlt(
+                                post.body,
+                                `${post.authorName} ${postTypeLabel(post.postType)}`,
+                              )}
+                              compact={post.media.length > 1}
+                              onOpen={() => {
+                                trackAdAnalytics({
+                                  kind: "explore",
+                                  assetId: post.id,
+                                  type: "click",
+                                  placement: "explore",
+                                });
+                                setLightbox({
+                                  url: m.url,
+                                  alt: imageAlt(
+                                    post.body,
+                                    `${post.authorName} ${postTypeLabel(post.postType)}`,
+                                  ),
+                                });
+                              }}
+                            />
+                          ),
+                        )}
+                      </div>
+                    )}
 
-                      {post.body && (
-                        <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-[#1E1E1E]">
-                          {post.body}
-                        </p>
-                      )}
-
-                      {post.media.length > 0 && (
-                        <div
-                          className={`mt-3 overflow-hidden rounded-2xl bg-[#F3F4F6] ${
-                            post.media.length === 1
-                              ? "ring-1 ring-[#EEF2F7]"
-                              : "grid grid-cols-2 gap-0.5"
-                          }`}
-                        >
-                          {post.media.slice(0, 4).map((m, i) =>
-                            m.type === "video" ? (
-                              <video
-                                key={`${post.id}-media-${i}`}
-                                src={m.url}
-                                controls
-                                playsInline
-                                className={`w-full bg-black object-contain ${
-                                  post.media.length === 1
-                                    ? "max-h-[420px]"
-                                    : "aspect-square object-cover"
-                                }`}
-                              />
-                            ) : (
-                              <div
-                                key={`${post.id}-media-${i}`}
-                                className={`relative w-full bg-[#F3F4F6] ${
-                                  post.media.length === 1
-                                    ? "min-h-[200px]"
-                                    : "aspect-square"
-                                }`}
-                              >
-                                <Image
-                                  src={m.url}
-                                  alt=""
-                                  fill
-                                  className={
-                                    post.media.length === 1
-                                      ? "object-contain"
-                                      : "object-cover"
-                                  }
-                                  sizes="(max-width: 640px) 100vw, 560px"
-                                />
-                              </div>
-                            ),
-                          )}
-                        </div>
-                      )}
-
-                      {post.featuredSchool && (
+                    {post.featuredSchool && (
+                      <div className="px-4 pt-3 sm:px-5">
                         <Link
                           href={
                             post.featuredSchool.slug
                               ? `/apply/school/${encodeURIComponent(post.featuredSchool.slug)}`
                               : `/university-forms/${post.featuredSchool.id}`
                           }
-                          className="mt-3 flex items-center gap-3 rounded-2xl border border-[#E8EEF5] bg-[#F8FBFF] p-3 transition hover:border-[#BFDBFE] hover:bg-[#EFF6FF]"
+                          onClick={() =>
+                            trackAdAnalytics({
+                              kind: "explore",
+                              assetId: post.id,
+                              type: "click",
+                              placement: "explore",
+                            })
+                          }
+                          className="flex items-center gap-3 rounded-2xl border border-[#E8EEF5] bg-[#F8FBFF] px-3 py-2.5 transition hover:border-[#BFDBFE]"
                         >
-                          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-[#E5E7EB]">
+                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-[#E5E7EB]">
                             {post.featuredSchool.logoSrc ? (
-                              <Image
+                              <OptimizedImage
                                 src={post.featuredSchool.logoSrc}
-                                alt=""
+                                alt={`${post.featuredSchool.name} logo`}
                                 fill
+                                sizes="40px"
                                 className="object-contain p-1"
                               />
                             ) : null}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-[#111827]">
-                              {post.featuredSchool.name}
+                            <p className="flex items-center gap-1 truncate text-sm font-semibold text-[#111827]">
+                              <span className="truncate">{post.featuredSchool.name}</span>
+                              <BadgeCheck
+                                className="h-3.5 w-3.5 shrink-0 text-[#007AFF]"
+                                fill="currentColor"
+                                stroke="white"
+                              />
                             </p>
                             {post.featuredSchool.deadline && (
                               <p className="text-xs text-[#DC2626]">
@@ -487,10 +745,10 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                             )}
                           </div>
                         </Link>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
-                    <div className="flex items-center justify-between gap-1 border-t border-[#F1F5F9] px-2 py-1.5 sm:px-3">
+                    <div className="mt-1 flex items-center justify-between gap-1 px-2 py-1.5 sm:px-3">
                       <button
                         type="button"
                         onClick={() => void toggleLike(post)}
@@ -580,10 +838,11 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                 comments.map((c) => (
                   <div key={c.id} className="flex gap-2.5">
                     <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gray-100">
-                      <Image
+                      <OptimizedImage
                         src={c.userAvatar || "/hero/avatar.png"}
                         alt=""
                         fill
+                        sizes="32px"
                         className="object-cover"
                       />
                     </div>
@@ -623,6 +882,35 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {lightbox && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-zoom-out"
+            aria-label="Close image"
+            onClick={() => setLightbox(null)}
+          />
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-[#111827]"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <ResponsiveMediaImg
+            src={lightbox.url}
+            alt={lightbox.alt}
+            sizes={IMAGE_SIZES.lightbox}
+            widths={SRCSET_WIDTHS.lightbox}
+            widthHint={1600}
+            loading="eager"
+            fetchPriority="high"
+            className="relative z-10 max-h-[90vh] max-w-full object-contain"
+          />
         </div>
       )}
     </>

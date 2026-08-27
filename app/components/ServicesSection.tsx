@@ -29,7 +29,7 @@ const services = [
 
 export function ServicesSection() {
   return (
-    <section className="mt-16 bg-[#007AFF] py-12 text-white md:py-16">
+    <section className="mt-10 bg-[#007AFF] py-10 text-white md:mt-12 md:py-12">
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 md:flex-row md:items-start md:gap-12 md:px-10">
         {/* Left heading */}
         <div className="md:w-1/3">

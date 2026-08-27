@@ -10,6 +10,7 @@ import {
   type ExplorePostDoc,
   type ExplorePostType,
 } from "@/lib/explore/types";
+import { parseOptionalEmail, parseOptionalText } from "@/lib/ad-analytics";
 
 function parseMedia(raw: unknown): ExploreMedia[] {
   if (!Array.isArray(raw)) return [];
@@ -68,7 +69,9 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      posts: docs.map((doc) => serializeExplorePost(doc)),
+      posts: docs.map((doc) =>
+        serializeExplorePost(doc, null, { includeAdvertiser: true }),
+      ),
     });
   } catch (error) {
     console.error("[admin/explore-posts] GET error", error);
@@ -131,6 +134,9 @@ export async function POST(req: NextRequest) {
       media,
       featuredSchool,
       isSponsored,
+      advertiserName: parseOptionalText(body.advertiserName),
+      advertiserEmail: parseOptionalEmail(body.advertiserEmail),
+      campaignName: parseOptionalText(body.campaignName),
       status,
       likes: [],
       likeCount: 0,
@@ -147,7 +153,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      post: serializeExplorePost({ ...doc, _id: result.insertedId }),
+      post: serializeExplorePost(
+        { ...doc, _id: result.insertedId },
+        null,
+        { includeAdvertiser: true },
+      ),
     });
   } catch (error) {
     console.error("[admin/explore-posts] POST error", error);

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Image from "next/image";
 import { getDb } from "../../../lib/mongodb";
 import { absoluteUrl, getSiteUrl } from "@/lib/site-url";
 import { Header } from "@/app/components/Header";
@@ -9,8 +8,13 @@ import { Footer } from "@/app/components/Footer";
 import { ShareButtons } from "@/app/components/ShareButtons";
 import { BlogAdLabel } from "@/app/components/BlogAdLabel";
 import { BlogAdSnippets } from "@/app/components/BlogAdSnippets";
+import { BlogPostImage } from "@/app/components/BlogPostImage";
 import { getPublicActiveAds } from "@/lib/ads";
 import { publicBlogPostFilter } from "@/lib/blog-visibility";
+import {
+  ogImageUrl,
+  rewriteHtmlImages,
+} from "@/lib/cloudinary-image";
 import { Search, ArrowLeft } from "lucide-react";
 import ScrollToTop from "../../components/ScrollToTop";
 import { CommentsSection } from "../components/CommentsSection";
@@ -130,10 +134,11 @@ export async function generateMetadata({
 
   const publishedTime = new Date(post.date).toISOString();
   const modifiedTime = new Date(post.updatedAt || post.date).toISOString();
-  const primaryShareImage = post.featuredImageUrl
-    ? post.featuredImageUrl.startsWith("http")
-      ? post.featuredImageUrl
-      : absoluteUrl(post.featuredImageUrl)
+  const optimizedShareImage = ogImageUrl(post.featuredImageUrl);
+  const primaryShareImage = optimizedShareImage
+    ? optimizedShareImage.startsWith("http")
+      ? optimizedShareImage
+      : absoluteUrl(optimizedShareImage)
     : null;
   const openGraphImages = primaryShareImage
     ? [{ url: primaryShareImage, alt: post.title }]
@@ -224,7 +229,7 @@ export default async function BlogPostPage({
     },
     headline: post.title,
     image: post.featuredImageUrl
-      ? [absoluteUrl(post.featuredImageUrl)]
+      ? [absoluteUrl(ogImageUrl(post.featuredImageUrl) || post.featuredImageUrl)]
       : [`${siteUrl}/og-image.jpg`],
     datePublished: new Date(post.date).toISOString(),
     dateModified: new Date(post.updatedAt || post.date).toISOString(),
@@ -254,19 +259,19 @@ export default async function BlogPostPage({
     />
   
     {/* NAVBAR */}
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-4 md:px-10 md:py-8">
+    <div className="mx-auto flex max-w-6xl flex-col px-4 sm:px-6 md:px-10">
       <Header />
     </div>
   
     {/* MAIN */}
-    <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 pt-4 pb-10 md:px-6 md:pt-5 lg:px-8">
       <div className="grid grid-cols-1 gap-16 lg:grid-cols-[1fr_320px]">
   
         {/* ================= MAIN CONTENT ================= */}
         <main className="min-w-0">
   
           {/* Back Button */}
-          <div className="mb-8">
+          <div className="mb-4">
             <Link
               href="/blog"
               className="group inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-[#007AFF] transition"
@@ -281,13 +286,10 @@ export default async function BlogPostPage({
           {/* Featured Image */}
           {post.featuredImageUrl && (
             <div className="mb-10 overflow-hidden rounded-3xl bg-[#F3F4F6] shadow-md ring-1 ring-gray-900/5">
-              <Image
+              <BlogPostImage
                 src={post.featuredImageUrl}
                 alt={post.title}
-                width={1600}
-                height={1000}
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1100px"
-                className="mx-auto h-auto w-full max-h-[min(80vh,820px)] object-contain"
+                variant="hero"
                 priority
               />
             </div>
@@ -325,7 +327,11 @@ export default async function BlogPostPage({
   
             <div
               className="tiptap ProseMirror simple-editor !p-0"
-              dangerouslySetInnerHTML={{ __html: post.contentHtml }}
+              dangerouslySetInnerHTML={{
+                __html: rewriteHtmlImages(post.contentHtml, {
+                  fallbackAlt: post.title,
+                }),
+              }}
             />
           </article>
   
@@ -389,17 +395,15 @@ export default async function BlogPostPage({
                     href={`/blog/${rel.slug}`}
                     className="group flex gap-4"
                   >
-                    <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-lg bg-[#F3F4F6] ring-1 ring-gray-900/5">
+                    <div className="shrink-0">
                       {rel.featuredImageUrl ? (
-                        <Image
+                        <BlogPostImage
                           src={rel.featuredImageUrl}
                           alt={rel.title}
-                          fill
-                          className="object-contain p-0.5 transition group-hover:opacity-90"
-                          sizes="96px"
+                          variant="thumb"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-gray-400">
+                        <div className="flex h-20 w-24 items-center justify-center rounded-lg bg-[#F3F4F6] text-gray-400 ring-1 ring-gray-900/5">
                           📝
                         </div>
                       )}

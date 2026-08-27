@@ -10,6 +10,9 @@ export type AdDoc = {
   videoUrl?: string | null;
   targetUrl?: string | null;
   ctaText?: string | null;
+  advertiserName?: string | null;
+  advertiserEmail?: string | null;
+  campaignName?: string | null;
   isActive: boolean;
   startDate: Date;
   endDate: Date;
@@ -25,6 +28,9 @@ export type SerializedAd = {
   videoUrl: string | null;
   targetUrl: string | null;
   ctaText: string;
+  advertiserName: string;
+  advertiserEmail: string;
+  campaignName: string;
   isActive: boolean;
   startDate: string;
   endDate: string;
@@ -45,6 +51,9 @@ export function serializeAdDoc(ad: AdDoc): SerializedAd {
     videoUrl: ad.videoUrl ?? null,
     targetUrl: ad.targetUrl ?? null,
     ctaText: (ad.ctaText?.trim() || "Learn more") as string,
+    advertiserName: ad.advertiserName?.trim() ?? "",
+    advertiserEmail: ad.advertiserEmail?.trim() ?? "",
+    campaignName: ad.campaignName?.trim() ?? "",
     isActive: ad.isActive,
     startDate: (ad.startDate ?? new Date(0)).toISOString(),
     endDate: (ad.endDate ?? new Date(0)).toISOString(),

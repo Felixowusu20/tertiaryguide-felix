@@ -5,16 +5,24 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  BadgeCheck,
+  CalendarClock,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   GraduationCap,
   Loader2,
+  Search,
 } from "lucide-react";
 import { Header } from "@/app/components/Header";
 import { Footer } from "@/app/components/Footer";
-import { SchoolListLabel } from "@/app/components/SchoolListLabel";
+import { ApplicationLoginModal } from "@/app/components/ApplicationLoginModal";
+import {
+  ApplicationPrintout,
+  type ApplicationPrintoutData,
+} from "@/app/components/ApplicationPrintout";
 import { isDeadlineCalendarExpired } from "@/lib/deadlines";
+import { partnerSchoolBuyFormsHref } from "@/lib/school-links";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import {
   getStoredUserEmail,
@@ -45,6 +53,10 @@ type PartnerSchool = {
   requiresVoucher: boolean;
   deadline?: string | null;
   brandColor?: string | null;
+  brandColors?: string[] | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
 };
 
 function schoolLabel(school: Pick<PartnerSchool, "name" | "alias">) {
@@ -113,14 +125,18 @@ function ApplyContent() {
   const [submitted, setSubmitted] = useState<{
     applicationNumber: string;
     schoolName: string;
+    updated?: boolean;
+    printout?: ApplicationPrintoutData;
   } | null>(null);
 
   const [authReady, setAuthReady] = useState(false);
+  const [schoolQuery, setSchoolQuery] = useState("");
+  const [loginSchool, setLoginSchool] = useState<PartnerSchool | null>(null);
 
   useEffect(() => {
-    const email = requireClientAuth(router);
-    if (!email) return;
+    const email = getStoredUserEmail();
     setAuthReady(true);
+    if (!email) return;
     setBuyerEmail(email);
     setLoginEmail(email);
     const name = getStoredUserName();
@@ -134,7 +150,6 @@ function ApplyContent() {
   }, [router]);
 
   useEffect(() => {
-    if (!authReady) return;
     let cancelled = false;
     async function load() {
       try {
@@ -149,7 +164,7 @@ function ApplyContent() {
     return () => {
       cancelled = true;
     };
-  }, [authReady]);
+  }, []);
 
   // Deep-link: ?school=slug&step=...
   useEffect(() => {
@@ -184,6 +199,9 @@ function ApplyContent() {
 
     if (stepParam && ["select", "voucher", "voucher-success", "login", "form", "done"].includes(stepParam)) {
       setStep(stepParam);
+      if (stepParam === "form" || stepParam === "done") {
+        setLoginSchool(null);
+      }
     }
 
     if (reference && (stepParam === "voucher-success" || !stepParam)) {
@@ -232,20 +250,10 @@ function ApplyContent() {
   }, [loadingSchools, schools, searchParams]);
 
   const selectSchool = (s: PartnerSchool) => {
-    // Open the school profile (cut-offs, blog, buy voucher) before applying
-    if (s.slug) {
-      router.push(`/apply/school/${encodeURIComponent(s.slug)}`);
-      return;
-    }
-    setSchool(s);
     setError(null);
-    if (s.requiresVoucher) {
-      setStep("voucher");
-      router.replace(`/apply?school=${s.id}&step=voucher`);
-    } else {
-      setStep("login");
-      router.replace(`/apply?school=${s.id}&step=login`);
-    }
+    setSerialNumber("");
+    setVoucherCode("");
+    setLoginSchool(s);
   };
 
   const startPayment = async (e: React.FormEvent) => {
@@ -314,17 +322,6 @@ function ApplyContent() {
         email: buyerEmail || undefined,
       });
 
-      // Returning students with an existing application go to their portal
-      if (data.hasApplication) {
-        const params = new URLSearchParams({
-          schoolId: school.id,
-          voucherCode: code,
-          serialNumber: serial,
-        });
-        router.push(`/apply/portal?${params.toString()}`);
-        return;
-      }
-
       setStep("form");
       const params = new URLSearchParams({
         school: school.slug || school.id,
@@ -366,6 +363,16 @@ function ApplyContent() {
     }
   }, [step]);
 
+  const filteredSchools = useMemo(() => {
+    const q = schoolQuery.trim().toLowerCase();
+    if (!q) return schools;
+    return schools.filter((s) => {
+      const name = s.name.toLowerCase();
+      const alias = (s.alias ?? "").toLowerCase();
+      return name.includes(q) || alias.includes(q);
+    });
+  }, [schools, schoolQuery]);
+
   if (!authReady) {
     return (
       <main className="flex min-h-screen items-center justify-center">
@@ -380,7 +387,14 @@ function ApplyContent() {
       style={school ? brandThemeStyle(school.brandColor) : undefined}
     >
       <Header />
-      <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+      <main
+        className={`mx-auto px-4 pt-4 pb-10 sm:px-6 md:pt-6 md:pb-14 ${
+          step === "select"
+            ? "max-w-6xl md:px-10"
+            : "max-w-4xl"
+        }`}
+      >
+        {step !== "select" && (
         <div className="mb-8 flex items-start gap-3">
           {school?.logoSrc ? (
             <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
@@ -397,8 +411,16 @@ function ApplyContent() {
             </span>
           )}
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {school ? schoolLabel(school) : "Apply for admission"}
+            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              <span className="min-w-0">{school ? schoolLabel(school) : "Apply for admission"}</span>
+              {school && (
+                <BadgeCheck
+                  className="h-6 w-6 shrink-0 text-[#007AFF]"
+                  fill="currentColor"
+                  stroke="white"
+                  aria-label="Verified partner school"
+                />
+              )}
             </h1>
             <p className="mt-1 text-sm text-[#6B7280]">
               {school
@@ -407,6 +429,7 @@ function ApplyContent() {
             </p>
           </div>
         </div>
+        )}
 
         {error && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -415,113 +438,115 @@ function ApplyContent() {
         )}
 
         {step === "select" && (
-          <section className="space-y-4">
-            <p className="text-sm text-[#4B5563]">
-              Choose the school you want to apply to. Already bought a voucher?{" "}
-              <Link href="/apply/portal" className="text-[var(--school-brand,#007AFF)] underline">
-                Check status / edit form
-              </Link>
-              . Looking for public university vouchers?{" "}
-              <Link href="/university-forms" className="text-[var(--school-brand,#007AFF)] underline">
-                Buy university forms
-              </Link>
-              .
-            </p>
+          <section className="space-y-6 md:space-y-8">
+            <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between md:gap-8">
+              <div className="min-w-0 max-w-2xl">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#007AFF]">
+                  Apply online
+                </p>
+                <h1 className="mt-1 text-[1.65rem] font-bold leading-tight tracking-tight text-[#0F172A] sm:text-3xl md:text-4xl">
+                  Apply to a Partner School
+                </h1>
+                <p className="mt-2 text-sm leading-relaxed text-[#64748B] sm:text-[15px] md:text-base">
+                  Select the school you wish to apply to and complete your
+                  admission application in a few simple steps.
+                </p>
+              </div>
+
+              <label className="relative block w-full shrink-0 md:max-w-sm">
+                <Search
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  value={schoolQuery}
+                  onChange={(e) => setSchoolQuery(e.target.value)}
+                  placeholder="Search schools..."
+                  className="w-full rounded-full border border-[#E2E8F0] bg-white py-3 pl-10 pr-4 text-sm text-[#111827] shadow-sm outline-none placeholder:text-[#94A3B8] focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20"
+                  aria-label="Search schools"
+                />
+              </label>
+            </div>
+
             {loadingSchools ? (
-              <div className="flex justify-center py-16">
-                <Loader2 className="h-6 w-6 animate-spin text-[var(--school-brand,#007AFF)]" />
+              <div className="flex justify-center py-20">
+                <Loader2 className="h-6 w-6 animate-spin text-[#007AFF]" />
               </div>
             ) : schools.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-[#D1D5DB] bg-white px-6 py-12 text-center text-sm text-[#6B7280]">
+              <div className="rounded-3xl border border-dashed border-[#D1D5DB] bg-white px-6 py-16 text-center text-sm text-[#6B7280]">
                 No institutions are accepting applications yet.
               </div>
+            ) : filteredSchools.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-[#D1D5DB] bg-white px-6 py-16 text-center text-sm text-[#6B7280]">
+                No schools match “{schoolQuery.trim()}”.
+              </div>
             ) : (
-              <div className="w-full min-w-0 rounded-3xl border border-[#E5E7EB] bg-white p-3 shadow-sm sm:p-4">
-                <div
-                  className="grid min-w-0 grid-cols-[minmax(0,1fr)_5.25rem] items-center gap-x-1.5 border-b border-gray-200/90 px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--school-brand,#007AFF)] sm:hidden"
-                  role="row"
-                >
-                  <span className="min-w-0 text-left">School</span>
-                  <span className="text-right tabular-nums">Deadline</span>
-                </div>
-                <div
-                  className="hidden sm:grid sm:min-w-0 sm:grid-cols-[minmax(0,1fr)_9.5rem] sm:items-center sm:gap-x-4 sm:border-b sm:border-gray-200/90 sm:px-1 sm:py-3 text-[11px] font-medium text-[var(--school-brand,#007AFF)] md:text-xs"
-                  role="row"
-                >
-                  <span className="min-w-0 pl-2.5 text-left">School</span>
-                  <span className="pr-2.5 text-right tabular-nums">Deadline</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  {schools.map((s) => {
-                    const expired = isDeadlineCalendarExpired(s.deadline ?? null);
-                    const selected = school?.id === s.id;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => selectSchool(s)}
-                        className={`group grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_5.25rem] items-center gap-x-1.5 px-2 py-2.5 text-left transition-all duration-150 sm:grid-cols-[minmax(0,1fr)_9.5rem] sm:gap-x-4 sm:px-2.5 sm:py-3.5 ${
-                          selected
-                            ? "rounded-2xl bg-[var(--school-brand,#007AFF)] px-2.5 text-white sm:px-3.5"
-                            : "rounded-none bg-white hover:rounded-2xl hover:bg-[var(--school-brand,#007AFF)] hover:px-2.5 hover:text-white sm:hover:px-3.5 sm:hover:shadow-sm"
-                        }`}
-                      >
-                        <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
-                          <div
-                            className={`relative h-5 w-5 shrink-0 overflow-hidden rounded-sm sm:h-7 sm:w-7 ${
-                              selected ? "bg-white/95 p-0.5" : "group-hover:bg-white/95 sm:group-hover:p-0.5"
+              <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {filteredSchools.map((s) => {
+                  const expired = isDeadlineCalendarExpired(s.deadline ?? null);
+                  const shortName = schoolLabel(s);
+                  const showFullName =
+                    Boolean(s.alias?.trim()) && s.alias?.trim() !== s.name;
+                  return (
+                    <article
+                      key={s.id}
+                      className="flex flex-col rounded-3xl border border-[#E8EEF5] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#BFDBFE] hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)] sm:p-5 md:p-6"
+                    >
+                      <div className="flex min-w-0 flex-1 items-start gap-3 md:gap-4">
+                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-[#F8FAFC] ring-1 ring-[#EEF2F7] md:h-[4.5rem] md:w-[4.5rem]">
+                          {s.logoSrc ? (
+                            <Image
+                              src={s.logoSrc}
+                              alt={s.logoAlt || schoolLabel(s)}
+                              fill
+                              className="object-contain p-1.5"
+                              sizes="72px"
+                            />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center text-[#007AFF]">
+                              <GraduationCap className="h-6 w-6" />
+                            </span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1 pt-0.5">
+                          <p className="flex items-center gap-1.5 text-base font-semibold text-[#0F172A] md:text-lg">
+                            <span className="min-w-0 truncate">{shortName}</span>
+                            <BadgeCheck
+                              className="h-4 w-4 shrink-0 text-[#007AFF] md:h-[18px] md:w-[18px]"
+                              fill="currentColor"
+                              stroke="white"
+                              aria-label="Verified partner school"
+                            />
+                          </p>
+                          {showFullName && (
+                            <p className="mt-0.5 hidden truncate text-sm text-[#64748B] md:block">
+                              {s.name}
+                            </p>
+                          )}
+                          <p
+                            className={`mt-2 inline-flex items-center gap-1.5 text-sm ${
+                              expired ? "text-red-600" : "text-[#64748B]"
                             }`}
                           >
-                            {s.logoSrc ? (
-                              <Image
-                                src={s.logoSrc}
-                                alt={s.logoAlt || schoolLabel(s)}
-                                width={32}
-                                height={32}
-                                className="h-full w-full object-contain"
-                              />
-                            ) : (
-                              <span className="flex h-full w-full items-center justify-center text-[var(--school-brand,#007AFF)]">
-                                <GraduationCap className="h-4 w-4" />
-                              </span>
-                            )}
-                          </div>
-                          <SchoolListLabel
-                            name={s.name}
-                            alias={s.alias}
-                            className={`min-w-0 text-left text-[13px] font-medium leading-none sm:text-sm sm:leading-snug sm:break-words sm:[overflow-wrap:anywhere] ${
-                              selected
-                                ? "text-white"
-                                : "text-[#1E1E1E] group-hover:text-white"
-                            }`}
-                          />
+                            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                            <span>
+                              Deadline:{" "}
+                              {expired ? "Expired" : formatDeadline(s.deadline)}
+                            </span>
+                          </p>
                         </div>
-                        <span
-                          className={`w-full text-right text-[11px] font-medium tabular-nums leading-none sm:text-sm ${
-                            selected
-                              ? expired
-                                ? "text-red-100"
-                                : "text-white"
-                              : expired
-                                ? "text-red-600 group-hover:text-red-100"
-                                : "text-[#1E1E1E] group-hover:text-white"
-                          }`}
-                        >
-                          {expired ? (
-                            <>
-                              <span className="sm:hidden">Expired</span>
-                              <span className="hidden sm:inline">
-                                {formatDeadline(s.deadline)}
-                              </span>
-                            </>
-                          ) : (
-                            formatDeadline(s.deadline)
-                          )}
-                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => selectSchool(s)}
+                        className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#007AFF] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0066D6] active:scale-[0.99] md:mt-5"
+                      >
+                        Start Application
                       </button>
-                    );
-                  })}
-                </div>
+                    </article>
+                  );
+                })}
               </div>
             )}
           </section>
@@ -633,7 +658,7 @@ function ApplyContent() {
                 Please save the code and serial below.
               </p>
             )}
-            <div className="mt-4 rounded-2xl bg-[#F3F4F6] p-4 font-mono text-sm">
+            <div className="mt-4 rounded-2xl bg-[#F3F4F6] p-4 font-mono text-sm text-[#111827]">
               <p>
                 <strong>Serial Number:</strong> {serialNumber}
               </p>
@@ -678,7 +703,7 @@ function ApplyContent() {
                     required
                     value={serialNumber}
                     onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
-                    className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 font-mono outline-none focus:border-[var(--school-brand,#007AFF)]"
+                    className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 font-mono text-[#111827] caret-[#111827] outline-none placeholder:text-[#9CA3AF] focus:border-[var(--school-brand,#007AFF)]"
                     placeholder="TG-2026-001234"
                   />
                 </label>
@@ -688,7 +713,7 @@ function ApplyContent() {
                     required
                     value={voucherCode}
                     onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                    className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 font-mono outline-none focus:border-[var(--school-brand,#007AFF)]"
+                    className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 font-mono text-[#111827] caret-[#111827] outline-none placeholder:text-[#9CA3AF] focus:border-[var(--school-brand,#007AFF)]"
                     placeholder="HS-8K7D-29PX"
                   />
                 </label>
@@ -699,6 +724,15 @@ function ApplyContent() {
                 >
                   {busy ? "Validating…" : "Continue"}
                 </button>
+                <p className="text-center text-sm text-[#6B7280]">
+                  Don’t have a form yet?
+                </p>
+                <Link
+                  href={partnerSchoolBuyFormsHref(school)}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--school-brand,#007AFF)] px-5 py-2.5 text-center text-sm font-semibold text-[var(--school-brand,#007AFF)]"
+                >
+                  Buy new forms
+                </Link>
               </form>
             ) : (
               <form onSubmit={continueWithoutVoucher} className="mt-6 grid gap-4">
@@ -735,8 +769,14 @@ function ApplyContent() {
         {step === "form" && school && (
           <MultiStepApplicationForm
             schoolId={school.id}
-            schoolName={schoolLabel(school)}
+            schoolName={school.name}
             schoolSlug={school.slug}
+            schoolLogo={school.logoSrc}
+            brandColor={school.brandColor}
+            brandColors={school.brandColors}
+            schoolPhone={school.phone}
+            schoolEmail={school.email}
+            schoolAddress={school.address}
             voucherCode={voucherCode || undefined}
             serialNumber={serialNumber || undefined}
             loginEmail={!school.requiresVoucher ? loginEmail : undefined}
@@ -746,6 +786,8 @@ function ApplyContent() {
               setSubmitted({
                 applicationNumber: result.applicationNumber,
                 schoolName: result.schoolName,
+                updated: result.updated,
+                printout: result.printout,
               });
               setStep("done");
             }}
@@ -753,42 +795,64 @@ function ApplyContent() {
         )}
 
         {step === "done" && submitted && (
-          <section className="rounded-3xl border border-green-200 bg-white p-8 text-center shadow-sm">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-green-600" />
-            <h2 className="mt-4 text-xl font-semibold">Application submitted</h2>
-            <p className="mt-2 text-sm text-[#6B7280]">
-              Your application to{" "}
-              {school ? schoolLabel(school) : submitted.schoolName} has been received.
-            </p>
-            <p className="mt-4 font-mono text-lg font-semibold text-[var(--school-brand,#007AFF)]">
-              {submitted.applicationNumber}
-            </p>
-            <p className="mt-2 text-xs text-[#9CA3AF]">
-              A confirmation email has been sent to you. To check status or edit later,
-              visit{" "}
-              <Link href="/apply/portal" className="text-[var(--school-brand,#007AFF)] underline">
-                /apply/portal
-              </Link>{" "}
-              and log in with your voucher.
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Link
-                href="/apply/portal"
-                className="inline-flex rounded-full bg-[var(--school-brand,#007AFF)] px-5 py-2.5 text-sm font-semibold text-white"
-              >
-                Open my application portal
-              </Link>
-              <Link
-                href="/"
-                className="inline-flex rounded-full border border-[#E5E7EB] px-5 py-2.5 text-sm font-semibold"
-              >
-                Back to home
-              </Link>
+          <section className="space-y-6">
+            <div className="rounded-3xl border border-green-200 bg-white p-8 text-center shadow-sm">
+              <CheckCircle2 className="mx-auto h-12 w-12 text-green-600" />
+              <h2 className="mt-4 text-xl font-semibold">
+                {submitted.updated
+                  ? "Application updated"
+                  : "Application submitted"}
+              </h2>
+              <p className="mt-2 text-sm text-[#6B7280]">
+                Your application to{" "}
+                {school ? schoolLabel(school) : submitted.schoolName} has been
+                {submitted.updated ? " saved." : " received."}
+              </p>
+              <p className="mt-2 text-sm text-[#6B7280]">
+                You can still buy a form for another school.
+              </p>
+              <p className="mt-4 font-mono text-lg font-semibold text-[var(--school-brand,#007AFF)]">
+                {submitted.applicationNumber}
+              </p>
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                <Link
+                  href="/university-forms"
+                  className="inline-flex rounded-full bg-[var(--school-brand,#007AFF)] px-5 py-2.5 text-sm font-semibold text-white"
+                >
+                  Buy another form
+                </Link>
+                <Link
+                  href="/dashboard/my-applications"
+                  className="inline-flex rounded-full border border-[#E5E7EB] px-5 py-2.5 text-sm font-semibold"
+                >
+                  My Applications
+                </Link>
+              </div>
             </div>
+            {submitted.printout && school ? (
+              <ApplicationPrintout
+                school={{
+                  name: school.name,
+                  logoSrc: school.logoSrc,
+                  brandColor: school.brandColor,
+                  brandColors: school.brandColors,
+                  phone: school.phone,
+                  email: school.email,
+                  address: school.address,
+                }}
+                data={submitted.printout}
+              />
+            ) : null}
           </section>
         )}
       </main>
       <Footer />
+      {loginSchool && (
+        <ApplicationLoginModal
+          school={loginSchool}
+          onClose={() => setLoginSchool(null)}
+        />
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowRight,
   Bell,
@@ -14,7 +14,6 @@ import {
   CircleHelp,
   ClipboardCheck,
   FileStack,
-  FileCheck,
   GraduationCap,
   Home,
   Info,
@@ -35,6 +34,14 @@ import {
   type LastCheckerStored,
   type LastVoucherStored,
 } from "@/lib/last-purchase-badges";
+import { NotificationInbox } from "@/app/components/NotificationInbox";
+import {
+  readUserNotifications,
+  resolveNotificationHref,
+  unreadCount,
+  userNotificationsKey,
+  type AppNotification,
+} from "@/lib/notifications";
 
 type NavServiceItem = {
   name: string;
@@ -92,40 +99,34 @@ function readLastPurchasesFromStorage(): {
 
 function TertiaryLogo() {
   return (
-        <Link href="/">
-          <Image
-            src="/hero/logoTguide.png"
-            alt="TertiaryGuide"
-            width={1080}
-            height={200}
-            priority
-            quality={100}
-            sizes="(max-width: 768px) 172px, 216px"
-            className="h-8 w-auto cursor-pointer md:h-10"
-          />
-        </Link>
-      );
-    }
+    <Link href="/" className="inline-flex bg-transparent">
+      <Image
+        src="/hero/logoTguide.png"
+        alt="TertiaryGuide"
+        width={1029}
+        height={163}
+        priority
+        quality={100}
+        sizes="(max-width: 768px) 172px, 216px"
+        className="h-8 w-auto bg-transparent object-contain cursor-pointer md:h-10"
+      />
+    </Link>
+  );
+}
 
 
 export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; showUserControls?: boolean } = {}) {
   const pathname = usePathname();
+  const router = useRouter();
   const [solutionsOpen, setSolutionsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [exploreTabActive, setExploreTabActive] = useState(false);
   const [isAuthed, setIsAuthed] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [hasNewsNotification, setHasNewsNotification] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(0);
-  const [userNotifications, setUserNotifications] = useState<
-    {
-      id: string;
-      title: string;
-      body: string;
-      read: boolean;
-      createdAt: string;
-    }[]
-  >([]);
+  const [userNotifications, setUserNotifications] = useState<AppNotification[]>(
+    [],
+  );
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
   const [lastVoucher, setLastVoucher] = useState<LastVoucherStored | null>(null);
@@ -209,7 +210,8 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
       if (typeof window === "undefined") return;
       const onHome = window.location.pathname === "/";
       const tab = new URLSearchParams(window.location.search).get("tab");
-      setExploreTabActive(onHome && tab === "explore");
+      const onExplorePage = window.location.pathname === "/explore";
+      setExploreTabActive(onExplorePage || (onHome && tab === "explore"));
     };
 
     syncExploreTab();
@@ -283,7 +285,7 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
           // Avoid duplicates
           if (prev.some((n) => n.id === notifId)) return prev;
 
-          const newNotification = {
+          const newNotification: AppNotification = {
             id: notifId,
             title: parsed.pending ? "Voucher Queued" : "Voucher Issued",
             body: parsed.pending
@@ -291,6 +293,8 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
               : "Your voucher has been successfully issued.",
             read: false,
             createdAt: new Date().toISOString(),
+            href: "/dashboard/my-forms",
+            kind: "voucher",
           };
 
           const next = [newNotification, ...prev];
@@ -326,7 +330,7 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
         setUserNotifications((prev) => {
           if (prev.some((n) => n.id === notifId)) return prev;
 
-          const newNotification = {
+          const newNotification: AppNotification = {
             id: notifId,
             title: parsed.pending ? "WASSCE Order Queued" : "WASSCE Checker Issued",
             body: parsed.pending
@@ -334,6 +338,8 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
               : "Your WASSCE checker has been successfully issued.",
             read: false,
             createdAt: new Date().toISOString(),
+            href: "/dashboard/my-checkers",
+            kind: "checker",
           };
 
           const next = [newNotification, ...prev];
@@ -477,8 +483,7 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastChecker?.pending, lastChecker?.reference]);
 
-  // Load simple notification state from the saved notification preferences
-  // so the drawer and bell reflect whether the user has opted in.
+  // Load saved notifications so the bell and drawer stay in sync.
   useEffect(() => {
     const loadNotifications = async () => {
       try {
@@ -486,52 +491,31 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
         const email = window.localStorage.getItem("tg_user_email");
         if (!email) {
           setHasNewsNotification(false);
-          setNotificationCount(0);
           setUserNotifications([]);
           return;
         }
 
-        const res = await fetch(
-          `/api/notification/preferences?email=${encodeURIComponent(email)}`,
-        );
-        const data = await res.json();
+        const items = readUserNotifications(email);
+        setUserNotifications(items);
 
-        if (!res.ok) {
+        try {
+          const res = await fetch(
+            `/api/notification/preferences?email=${encodeURIComponent(email)}`,
+          );
+          const data = await res.json();
+          setHasNewsNotification(Boolean(res.ok && data.newsUpdates));
+        } catch {
           setHasNewsNotification(false);
-          const key = `tg_notifications:${email.toLowerCase()}`;
-          const stored = window.localStorage.getItem(key);
-          const parsed = stored ? JSON.parse(stored) : [];
-          const unread = Array.isArray(parsed)
-            ? parsed.filter((n: any) => !n.read).length
-            : 0;
-          setUserNotifications(Array.isArray(parsed) ? parsed : []);
-          setNotificationCount(unread);
-          return;
         }
-
-        const enabled = Boolean(data.newsUpdates);
-        setHasNewsNotification(enabled);
-
-        const key = `tg_notifications:${email.toLowerCase()}`;
-        const stored = window.localStorage.getItem(key);
-        const parsed = stored ? JSON.parse(stored) : [];
-        const unreadLocal = Array.isArray(parsed)
-          ? parsed.filter((n: any) => !n.read).length
-          : 0;
-        setUserNotifications(Array.isArray(parsed) ? parsed : []);
-
-        const totalCount = unreadLocal + (enabled ? 1 : 0);
-        setNotificationCount(totalCount);
       } catch {
         setHasNewsNotification(false);
         setUserNotifications([]);
-        setNotificationCount(0);
       }
     };
 
     if (!isAuthed) {
       setHasNewsNotification(false);
-      setNotificationCount(0);
+      setUserNotifications([]);
       return;
     }
 
@@ -567,24 +551,40 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
     };
   }, [isAuthed]);
 
-  const updateLocalNotifications = (updater: (current: typeof userNotifications) => typeof userNotifications) => {
+  const persistNotifications = (
+    updater: (current: AppNotification[]) => AppNotification[],
+  ) => {
     if (typeof window === "undefined") return;
     const email = window.localStorage.getItem("tg_user_email");
     if (!email) return;
 
     setUserNotifications((current) => {
       const next = updater(current);
-      const key = `tg_notifications:${email.toLowerCase()}`;
-      window.localStorage.setItem(key, JSON.stringify(next));
-
-      const unreadLocal = next.filter((n) => !n.read).length;
-      const totalCount = unreadLocal + (hasNewsNotification ? 1 : 0);
-      setNotificationCount(totalCount);
-
+      try {
+        window.localStorage.setItem(
+          userNotificationsKey(email),
+          JSON.stringify(next.slice(0, 80)),
+        );
+      } catch {
+        // ignore quota errors
+      }
       return next;
     });
+    queueMicrotask(() => {
+      window.dispatchEvent(new CustomEvent("tg-notifications-updated"));
+    });
+  };
 
-    window.dispatchEvent(new CustomEvent("tg-notifications-updated"));
+  const notificationCount = unreadCount(userNotifications);
+
+  const openNotification = (notification: AppNotification) => {
+    persistNotifications((current) =>
+      current.map((n) =>
+        n.id === notification.id ? { ...n, read: true } : n,
+      ),
+    );
+    setNotificationsOpen(false);
+    router.push(resolveNotificationHref(notification));
   };
 
   const myFormsHref = isAuthed
@@ -641,19 +641,14 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
       label: "Apply",
       items: [
         {
-          name: "Direct Applications",
+          name: "Apply online",
           description: "Apply online through the TertiaryGuide portal",
           href: "/apply",
           icon: GraduationCap,
           match: (path) =>
-            path === "/apply" || path.startsWith("/apply/school/"),
-        },
-        {
-          name: "Application Portal",
-          description: "Continue or track an application in progress",
-          href: "/apply/portal",
-          icon: FileCheck,
-          match: (path) => path.startsWith("/apply/portal"),
+            path === "/apply" ||
+            path.startsWith("/apply/school/") ||
+            path.startsWith("/apply/portal"),
         },
       ],
     },
@@ -770,7 +765,7 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
               Notifications
             </h2>
             <p className="text-xs text-[#9E9E9E]">
-              Stay up to date with your admission journey.
+              Tap an item to open the related page.
             </p>
           </div>
           <button
@@ -783,83 +778,50 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
           </button>
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4 text-sm">
-          {notificationCount === 0 ? (
-            <div className="rounded-2xl border border-[#F0F0F0] bg-[#F9FAFB] px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-[#9E9E9E]">
-                Today
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[#1E1E1E]">
-                No notifications yet
-              </p>
-              <p className="mt-1 text-xs text-[#555555]">
-                Turn on updates in your dashboard to start receiving important admission reminders.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="rounded-2xl border border-[#F0F0F0] bg-[#F9FAFB] px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-[#9E9E9E]">
-                  Today
-                </p>
-                <p className="mt-1 text-sm font-semibold text-[#1E1E1E]">
-                  Email updates enabled
-                </p>
-                <p className="mt-1 text-xs text-[#555555]">
-                  We&apos;ll send you news, announcements, and product updates that match your preferences.
-                </p>
-              </div>
-
-              {!hasNewsNotification && null}
-
-              {userNotifications.length > 0 && (
-                <div className="space-y-3">
-                  {userNotifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className="rounded-2xl border border-[#F0F0F0] bg-white px-4 py-3"
-                    >
-                      <p className="text-xs font-medium uppercase tracking-wide text-[#9E9E9E]">
-                        Activity
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-[#1E1E1E]">
-                        {notification.title}
-                      </p>
-                      <p className="mt-1 text-xs text-[#555555]">
-                        {notification.body}
-                      </p>
-                      <div className="mt-2 flex items-center justify-between text-[11px] text-[#9E9E9E]">
-                        <span>
-                          {new Date(notification.createdAt).toLocaleString()}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateLocalNotifications((current) =>
-                              current.map((n) =>
-                                n.id === notification.id
-                                  ? { ...n, read: !n.read }
-                                  : n,
-                              ),
-                            )
-                          }
-                          className="rounded-full border border-[#E0E0E0] px-3 py-1 text-[11px] font-medium text-[#1E1E1E] hover:bg-[#F5F5F5]"
-                        >
-                          {notification.read ? "Mark as unread" : "Mark as read"}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        <NotificationInbox
+          items={userNotifications}
+          onOpen={(item) => openNotification(item as AppNotification)}
+          onToggleRead={(id) =>
+            persistNotifications((current) =>
+              current.map((n) => (n.id === id ? { ...n, read: !n.read } : n)),
+            )
+          }
+          onDelete={(id) =>
+            persistNotifications((current) => current.filter((n) => n.id !== id))
+          }
+          onMarkAllRead={() =>
+            persistNotifications((current) =>
+              current.map((n) => ({ ...n, read: true })),
+            )
+          }
+          onMarkAllUnread={() =>
+            persistNotifications((current) =>
+              current.map((n) => ({ ...n, read: false })),
+            )
+          }
+          onClearAll={() => {
+            if (userNotifications.length === 0) return;
+            if (
+              typeof window !== "undefined" &&
+              !window.confirm("Clear all notifications?")
+            ) {
+              return;
+            }
+            persistNotifications(() => []);
+          }}
+        />
 
         <div className="border-t border-[#E5E5E5] px-5 py-3 text-xs text-[#9E9E9E]">
-          Manage what you receive from
-          <span className="font-medium text-[#1E1E1E]"> Notifications</span>
-          <span> • TertiaryGuide</span>
+          {hasNewsNotification ? (
+            <p className="mb-1">News and product updates are on.</p>
+          ) : null}
+          <Link
+            href="/dashboard/notification"
+            onClick={() => setNotificationsOpen(false)}
+            className="font-medium text-[#007AFF] hover:underline"
+          >
+            See all & manage preferences
+          </Link>
         </div>
       </div>
     </>
@@ -895,6 +857,16 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
           }
         >
           Home
+        </Link>
+        <Link
+          href="/explore"
+          className={
+            pathname === "/explore" || exploreTabActive
+              ? "text-[#007AFF]"
+              : "hover:text-[#007AFF]"
+          }
+        >
+          Explore
         </Link>
         <div ref={dropdownRef} className="relative">
           <button
@@ -1187,22 +1159,32 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
         </div>
       )}
 
-        {/* Mobile: menu only (notifications live inside the drawer) */}
+        {/* Mobile: notifications + menu */}
         <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 md:hidden">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(true)}
-            className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E0E0E0] text-[#1E1E1E] transition hover:border-[#D0D0D0] hover:bg-[#F5F5F5] active:scale-[0.95]"
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" />
-            {!hideAuth &&
-              (showUserControls || isAuthed) &&
-              notificationCount > 0 && (
+          {!hideAuth && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setNotificationsOpen(true)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E0E0E0] text-[#1E1E1E] transition hover:border-[#D0D0D0] hover:bg-[#F5F5F5] active:scale-[0.95]"
+                aria-label="Notifications"
+              >
+                <Bell className="h-5 w-5" />
+              </button>
+              {notificationCount > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#007AFF] px-0.5 text-[9px] font-semibold text-white shadow-sm">
                   {notificationCount}
                 </span>
               )}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E0E0E0] text-[#1E1E1E] transition hover:border-[#D0D0D0] hover:bg-[#F5F5F5] active:scale-[0.95]"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
           </button>
         </div>
       </div>
@@ -1256,34 +1238,6 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
 
             {/* Scrollable nav */}
             <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
-              {!hideAuth && (showUserControls || isAuthed) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    setNotificationsOpen(true);
-                  }}
-                  className="mb-4 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] font-medium text-gray-700 transition hover:bg-gray-50 hover:text-[#007AFF] active:scale-[0.98]"
-                >
-                  <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-gray-500 ring-1 ring-gray-100">
-                    <Bell className="h-4 w-4" />
-                    {notificationCount > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#007AFF] px-1 text-[9px] font-semibold text-white">
-                        {notificationCount}
-                      </span>
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1 leading-snug">
-                    Notifications
-                  </span>
-                  {notificationCount > 0 && (
-                    <span className="rounded-full bg-[#007AFF]/10 px-2 py-0.5 text-[11px] font-semibold text-[#007AFF]">
-                      {notificationCount}
-                    </span>
-                  )}
-                </button>
-              )}
-
               {mobileNavSections.map((section) => (
                 <div
                   key={section.label ?? "main"}

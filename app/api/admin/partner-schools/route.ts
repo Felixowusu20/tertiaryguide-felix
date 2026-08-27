@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
       requiresVoucher: true,
       isActive: body?.isActive !== false,
       isPartner: true,
-      isVerified: body?.isVerified === true,
+      isVerified: body?.isVerified !== false,
       showBlogOnMain: body?.showBlogOnMain === true,
       brandColor: null as string | null,
       categories: ["Private"],

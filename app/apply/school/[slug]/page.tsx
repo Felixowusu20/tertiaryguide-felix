@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, BadgeCheck, Loader2 } from "lucide-react";
 import { Header } from "@/app/components/Header";
 import { Footer } from "@/app/components/Footer";
 import { AuthModal } from "@/app/components/AuthModal";
@@ -226,7 +226,7 @@ export default function PartnerSchoolDetailPage() {
 
   return (
     <div className="min-h-screen bg-white text-[#1E1E1E]" style={themeStyle}>
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-4 md:px-10 md:py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-8 sm:px-6 md:gap-5 md:px-10 md:pb-10">
         <Header />
 
         {school && (
@@ -239,7 +239,7 @@ export default function PartnerSchoolDetailPage() {
           />
         )}
 
-        <main className="mt-10 flex flex-col gap-10 md:mt-16 md:flex-row md:items-start md:justify-between">
+        <main className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
           <section className="max-w-2xl space-y-6 text-sm leading-relaxed md:text-base">
             {loading ? (
               <h1 className="text-3xl font-semibold leading-tight md:text-4xl">
@@ -274,8 +274,14 @@ export default function PartnerSchoolDetailPage() {
                     </div>
                   )}
                   <div className="min-w-0 space-y-2">
-                    <h1 className="text-2xl font-semibold leading-tight">
-                      {displayName}
+                    <h1 className="flex items-center gap-2 text-2xl font-semibold leading-tight">
+                      <span className="min-w-0">{displayName}</span>
+                      <BadgeCheck
+                        className="h-5 w-5 shrink-0 text-[#007AFF]"
+                        fill="currentColor"
+                        stroke="white"
+                        aria-label="Verified partner school"
+                      />
                     </h1>
                     <p className="text-sm font-medium">
                       Deadline:{" "}
@@ -291,8 +297,14 @@ export default function PartnerSchoolDetailPage() {
                   </div>
                 </div>
 
-                <h1 className="hidden text-3xl font-semibold leading-tight md:block md:text-4xl">
-                  {school.name}
+                <h1 className="hidden items-center gap-2.5 text-3xl font-semibold leading-tight md:flex md:text-4xl">
+                  <span className="min-w-0">{school.name}</span>
+                  <BadgeCheck
+                    className="h-7 w-7 shrink-0 text-[#007AFF]"
+                    fill="currentColor"
+                    stroke="white"
+                    aria-label="Verified partner school"
+                  />
                 </h1>
 
                 {aboutParagraphs.length > 0 ? (
