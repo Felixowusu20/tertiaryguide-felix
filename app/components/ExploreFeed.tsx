@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import {
   BadgeCheck,
@@ -17,6 +16,13 @@ import {
   X,
 } from "lucide-react";
 import { postTypeLabel, type ExplorePostType } from "@/lib/explore/types";
+import { OptimizedImage } from "@/app/components/OptimizedImage";
+import { ResponsiveMediaImg } from "@/app/components/ResponsiveMediaImg";
+import {
+  IMAGE_SIZES,
+  SRCSET_WIDTHS,
+  imageAlt,
+} from "@/lib/cloudinary-image";
 import {
   pauseInViewVideo,
   playInViewVideo,
@@ -27,6 +33,7 @@ import {
   getStoredUserName,
   signInRedirectHref,
 } from "@/lib/client-auth";
+import { trackAdAnalytics } from "@/lib/ad-analytics-client";
 
 type ExploreMedia = { type: "image" | "video"; url: string };
 
@@ -225,41 +232,46 @@ function ExploreVideo({
 
 function ExploreImage({
   src,
+  alt,
   compact = false,
   onOpen,
 }: {
   src: string;
+  alt: string;
   compact?: boolean;
   onOpen: () => void;
 }) {
-  const [shape, setShape] = useState<MediaShape>("portrait");
-
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={`relative w-full overflow-hidden bg-black ${mediaFrameClass(compact, shape)}`}
+      className={`relative block w-full overflow-hidden bg-white ${
+        compact ? "aspect-square" : ""
+      }`}
     >
-      <Image
+      <ResponsiveMediaImg
         src={src}
-        alt="Explore flyer"
-        fill
-        onLoad={(e) => {
-          const img = e.currentTarget;
-          setShape(mediaShapeFromRatio(img.naturalWidth, img.naturalHeight));
-        }}
-        className="object-cover object-center"
-        sizes={
+        alt={alt}
+        sizes={compact ? IMAGE_SIZES.exploreCompact : IMAGE_SIZES.explore}
+        widths={SRCSET_WIDTHS.feed}
+        widthHint={compact ? 480 : 800}
+        className={
           compact
-            ? "(max-width: 640px) 50vw, 280px"
-            : "(max-width: 640px) 100vw, 560px"
+            ? "absolute inset-0 h-full w-full object-contain object-center"
+            : "block h-auto w-full object-contain object-center"
         }
       />
     </button>
   );
 }
 
-export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
+export function ExploreFeed({
+  embedded = false,
+  variant = "tab",
+}: {
+  embedded?: boolean;
+  variant?: "tab" | "page";
+}) {
   const [posts, setPosts] = useState<ExplorePost[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -270,7 +282,9 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [commentBusy, setCommentBusy] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(
+    null,
+  );
   const viewedIds = useRef<Set<string>>(new Set());
   const observerRef = useRef<IntersectionObserver | null>(null);
 
@@ -313,6 +327,18 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
   const recordView = useCallback((postId: string) => {
     if (viewedIds.current.has(postId)) return;
     viewedIds.current.add(postId);
+    trackAdAnalytics({
+      kind: "explore",
+      assetId: postId,
+      type: "impression",
+      placement: "explore",
+    });
+    trackAdAnalytics({
+      kind: "explore",
+      assetId: postId,
+      type: "view",
+      placement: "explore",
+    });
     void fetch(`/api/explore/posts/${postId}/view`, { method: "POST" })
       .then((r) => r.json())
       .then((data) => {
@@ -477,8 +503,8 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
         id="explore"
         className={
           embedded
-            ? "relative scroll-mt-24 bg-[#F7F9FC] pb-2"
-            : "relative mt-10 scroll-mt-24 overflow-hidden sm:mt-14 md:mt-16"
+            ? "relative scroll-mt-24 bg-[#F7F9FC] pb-0 md:bg-transparent"
+            : "relative mt-4 scroll-mt-24 overflow-hidden md:mt-5"
         }
       >
         {!embedded && (
@@ -491,7 +517,9 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
         <div
           className={
             embedded
-              ? "relative mx-auto max-w-xl px-3 pb-10 pt-4 sm:px-4 sm:pt-6"
+              ? variant === "page"
+                ? "relative mx-auto max-w-xl px-3 pb-4 pt-3 sm:px-4 md:max-w-none md:px-3 md:pb-5 md:pt-3"
+                : "relative mx-auto max-w-xl px-3 pb-4 pt-3 sm:px-4 sm:pt-4"
               : "relative mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12 md:px-10 md:py-14"
           }
         >
@@ -512,33 +540,50 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
           )}
 
           {embedded && (
-            <div className="mb-4 flex items-center gap-2.5 px-1">
-              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#007AFF] text-white">
-                <Compass className="h-4 w-4" />
-              </span>
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight text-[#0F172A]">
-                  Latest updates
-                </h2>
-                <p className="text-xs text-[#64748B]">
-                  Flyers, deadlines, and school news
-                </p>
-              </div>
+            <div
+              className={
+                variant === "page" ? "mb-4 px-1 md:hidden" : "mb-4 px-1"
+              }
+            >
+              <h2 className="text-lg font-semibold tracking-tight text-[#252525]">
+                Latest updates
+              </h2>
+              <p className="text-xs text-[#64748B]">
+                Flyers, deadlines, and school news
+              </p>
             </div>
           )}
 
           <div className={embedded ? "" : "mx-auto mt-8 max-w-xl sm:mt-10"}>
             {loading ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-[#E8EEF5] bg-white/80 py-16 shadow-sm">
+              <div
+                className={
+                  variant === "page"
+                    ? "flex flex-col items-center justify-center gap-3 rounded-2xl bg-white py-16"
+                    : "flex flex-col items-center justify-center gap-3 rounded-3xl border border-[#E8EEF5] bg-white/80 py-16 shadow-sm"
+                }
+              >
                 <Loader2 className="h-6 w-6 animate-spin text-[#007AFF]" />
                 <p className="text-sm text-[#6B7280]">Loading updates…</p>
               </div>
             ) : error ? (
-              <div className="rounded-3xl border border-red-100 bg-red-50 px-5 py-8 text-center text-sm text-red-700">
+              <div
+                className={
+                  variant === "page"
+                    ? "rounded-2xl bg-red-50 px-5 py-8 text-center text-sm text-red-700"
+                    : "rounded-3xl border border-red-100 bg-red-50 px-5 py-8 text-center text-sm text-red-700"
+                }
+              >
                 {error}
               </div>
             ) : posts.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-[#Dbeafe] bg-white px-5 py-14 text-center shadow-sm">
+              <div
+                className={
+                  variant === "page"
+                    ? "rounded-2xl bg-white px-5 py-14 text-center"
+                    : "rounded-3xl border border-dashed border-[#Dbeafe] bg-white px-5 py-14 text-center shadow-sm"
+                }
+              >
                 <Compass className="mx-auto h-8 w-8 text-[#007AFF]/50" />
                 <p className="mt-3 text-base font-semibold text-[#1E1E1E]">
                   Nothing to explore yet
@@ -549,20 +594,25 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                 </p>
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className={variant === "page" ? "space-y-4" : "space-y-5"}>
                 {posts.map((post) => (
                   <article
                     key={post.id}
                     ref={(node) => postNodeRef(node, post.id)}
-                    className="overflow-hidden rounded-[28px] border border-[#E8EEF5] bg-white shadow-[0_10px_32px_rgba(15,23,42,0.05)]"
+                    className={
+                      variant === "page"
+                        ? "overflow-hidden rounded-2xl bg-white"
+                        : "overflow-hidden rounded-[28px] border border-[#E8EEF5] bg-white shadow-[0_10px_32px_rgba(15,23,42,0.05)]"
+                    }
                   >
                     <header className="flex items-start gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
                       <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#EFF6FF] ring-2 ring-white shadow-sm">
                         {post.authorAvatar ? (
-                          <Image
+                          <OptimizedImage
                             src={post.authorAvatar}
                             alt=""
                             fill
+                            sizes="44px"
                             className="object-cover"
                           />
                         ) : (
@@ -573,7 +623,7 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                       </div>
                       <div className="min-w-0 flex-1 pt-0.5">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <p className="truncate text-[15px] font-semibold text-[#0F1419]">
+                          <p className="truncate text-sm font-semibold text-[#1E1E1E]">
                             {post.authorName}
                           </p>
                           {post.isSponsored && (
@@ -593,15 +643,17 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                     </header>
 
                     {post.body && (
-                      <p className="mt-3 whitespace-pre-wrap px-4 text-[15px] leading-relaxed text-[#1E1E1E] sm:px-5">
+                      <p className="mt-3 whitespace-pre-wrap px-4 text-sm leading-relaxed text-[#1E1E1E] sm:px-5">
                         {post.body}
                       </p>
                     )}
 
                     {post.media.length > 0 && (
                       <div
-                        className={`mt-3 overflow-hidden bg-[#0B1220] ${
-                          post.media.length === 1 ? "" : "grid grid-cols-2 gap-px"
+                        className={`mt-3 overflow-hidden ${
+                          post.media.length === 1
+                            ? ""
+                            : "grid grid-cols-2 gap-px bg-[#E8EEF5]"
                         }`}
                       >
                         {post.media.slice(0, 4).map((m, i) =>
@@ -615,8 +667,26 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                             <ExploreImage
                               key={`${post.id}-media-${i}`}
                               src={m.url}
+                              alt={imageAlt(
+                                post.body,
+                                `${post.authorName} ${postTypeLabel(post.postType)}`,
+                              )}
                               compact={post.media.length > 1}
-                              onOpen={() => setLightboxUrl(m.url)}
+                              onOpen={() => {
+                                trackAdAnalytics({
+                                  kind: "explore",
+                                  assetId: post.id,
+                                  type: "click",
+                                  placement: "explore",
+                                });
+                                setLightbox({
+                                  url: m.url,
+                                  alt: imageAlt(
+                                    post.body,
+                                    `${post.authorName} ${postTypeLabel(post.postType)}`,
+                                  ),
+                                });
+                              }}
                             />
                           ),
                         )}
@@ -631,14 +701,23 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                               ? `/apply/school/${encodeURIComponent(post.featuredSchool.slug)}`
                               : `/university-forms/${post.featuredSchool.id}`
                           }
+                          onClick={() =>
+                            trackAdAnalytics({
+                              kind: "explore",
+                              assetId: post.id,
+                              type: "click",
+                              placement: "explore",
+                            })
+                          }
                           className="flex items-center gap-3 rounded-2xl border border-[#E8EEF5] bg-[#F8FBFF] px-3 py-2.5 transition hover:border-[#BFDBFE]"
                         >
                           <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-[#E5E7EB]">
                             {post.featuredSchool.logoSrc ? (
-                              <Image
+                              <OptimizedImage
                                 src={post.featuredSchool.logoSrc}
-                                alt=""
+                                alt={`${post.featuredSchool.name} logo`}
                                 fill
+                                sizes="40px"
                                 className="object-contain p-1"
                               />
                             ) : null}
@@ -759,10 +838,11 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
                 comments.map((c) => (
                   <div key={c.id} className="flex gap-2.5">
                     <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gray-100">
-                      <Image
+                      <OptimizedImage
                         src={c.userAvatar || "/hero/avatar.png"}
                         alt=""
                         fill
+                        sizes="32px"
                         className="object-cover"
                       />
                     </div>
@@ -805,26 +885,30 @@ export function ExploreFeed({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
 
-      {lightboxUrl && (
+      {lightbox && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4">
           <button
             type="button"
             className="absolute inset-0 cursor-zoom-out"
             aria-label="Close image"
-            onClick={() => setLightboxUrl(null)}
+            onClick={() => setLightbox(null)}
           />
           <button
             type="button"
-            onClick={() => setLightboxUrl(null)}
+            onClick={() => setLightbox(null)}
             className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-[#111827]"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightboxUrl}
-            alt="Explore flyer"
+          <ResponsiveMediaImg
+            src={lightbox.url}
+            alt={lightbox.alt}
+            sizes={IMAGE_SIZES.lightbox}
+            widths={SRCSET_WIDTHS.lightbox}
+            widthHint={1600}
+            loading="eager"
+            fetchPriority="high"
             className="relative z-10 max-h-[90vh] max-w-full object-contain"
           />
         </div>

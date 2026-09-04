@@ -72,7 +72,11 @@ export function ApproachingDeadlinesSection() {
   };
 
   const partnerSchools = schools
-    .filter((school) => school.isPartner || school.isVerified)
+    .filter(
+      (school) =>
+        (school.isPartner || school.isVerified) &&
+        !isDeadlineCalendarExpired(school.deadline),
+    )
     .sort(byDeadlineThenName);
 
   const approachingCatalog = schools
@@ -88,6 +92,7 @@ export function ApproachingDeadlinesSection() {
   const seen = new Set<string>();
   const approaching = [...partnerSchools, ...approachingCatalog]
     .filter((school) => {
+      if (isDeadlineCalendarExpired(school.deadline)) return false;
       if (seen.has(school.id)) return false;
       seen.add(school.id);
       return true;
@@ -129,9 +134,7 @@ export function ApproachingDeadlinesSection() {
             No application deadlines in the next {APPROACHING_DAYS} days.
           </div>
         ) : (
-          approaching.map((school) => {
-            const expired = isDeadlineCalendarExpired(school.deadline);
-            return (
+          approaching.map((school) => (
             <Link
               key={school.id}
               href={catalogSchoolHref(school)}
@@ -170,18 +173,11 @@ export function ApproachingDeadlinesSection() {
                 {formatPrice(school.priceGhs)}
               </span>
 
-              <span
-                className={`w-full text-right text-[11px] font-medium tabular-nums leading-none sm:text-sm ${
-                  expired
-                    ? "text-red-600 group-hover:text-white"
-                    : "text-[#252525] group-hover:text-white"
-                }`}
-              >
+              <span className="w-full text-right text-[11px] font-medium tabular-nums leading-none text-[#252525] group-hover:text-white sm:text-sm">
                 {formatDeadline(school.deadline)}
               </span>
             </Link>
-            );
-          })
+          ))
         )}
       </div>
 

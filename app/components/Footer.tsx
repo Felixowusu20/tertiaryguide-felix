@@ -39,7 +39,7 @@ const sectionTitleClass =
   "text-xs font-semibold uppercase tracking-[0.14em] text-white/55 lg:text-[13px]";
 
 const footerLinkClass =
-  "text-sm font-medium text-white/95 transition-colors hover:text-white hover:underline lg:text-[15px]";
+  "whitespace-nowrap text-sm font-medium text-white/95 transition-colors hover:text-white hover:underline lg:text-[15px]";
 
 const socialLinkClass =
   "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/12 text-white ring-1 ring-white/10 transition-colors hover:bg-white/20 lg:h-11 lg:w-11";
@@ -128,14 +128,14 @@ export function Footer() {
           <section className="flex flex-col items-center text-center md:col-span-2 md:items-start md:text-left lg:col-span-1">
             <Link
               href="/"
-              className="inline-flex rounded-xl bg-white px-4 py-2.5 shadow-sm transition-opacity hover:opacity-95 lg:px-5 lg:py-3"
+              className="inline-flex transition-opacity hover:opacity-90"
             >
               <Image
                 src="/hero/logoTguide.png"
                 alt="TertiaryGuide"
-                width={180}
-                height={40}
-                className="h-8 w-auto lg:h-9"
+                width={1029}
+                height={163}
+                className="h-8 w-auto brightness-0 invert lg:h-9"
               />
             </Link>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/75 lg:mt-5 lg:text-[15px] lg:leading-7">
@@ -147,7 +147,7 @@ export function Footer() {
             className={`space-y-4 text-center md:text-left ${mobileDividerClass} ${desktopColumnClass}`}
           >
             <p className={sectionTitleClass}>Quick Links</p>
-            <nav className="mx-auto grid max-w-xs grid-cols-2 gap-x-8 gap-y-3 text-left md:mx-0 md:max-w-none md:grid-cols-1 md:gap-y-2.5 lg:grid-cols-2 lg:gap-x-10 lg:gap-y-3">
+            <nav className="mx-auto grid max-w-xs grid-cols-2 gap-x-6 gap-y-3 text-left md:mx-0 md:max-w-none md:grid-cols-1 md:gap-y-2.5 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-3">
               {navLinks.map((item) => (
                 <Link key={item.label} href={item.href} className={footerLinkClass}>
                   {item.label}

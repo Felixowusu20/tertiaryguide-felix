@@ -212,7 +212,7 @@ function WassceCheckerSuccessContent() {
   }, [searchParams]);
 
   return (
-    <main className="mt-16 flex flex-col items-center justify-center gap-4 text-center">
+    <main className="flex flex-col items-center justify-center gap-4 text-center">
       <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
         WASSCE Checker Purchase
       </h1>
@@ -236,7 +236,7 @@ function WassceCheckerSuccessContent() {
 export default function WassceCheckerSuccessPage() {
   return (
     <div className="min-h-screen bg-white text-[#1E1E1E]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-4 md:px-10 md:py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-8 sm:px-6 md:gap-5 md:px-10 md:pb-10">
         <Header />
 
         <Suspense fallback={null}>

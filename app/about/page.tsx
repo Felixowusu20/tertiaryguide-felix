@@ -9,13 +9,13 @@ import { Link2, Pencil, BookOpen, Target, Eye, Users } from "lucide-react";
 export default function AboutPage() {
     return (
         <div className="min-h-screen bg-white text-[#1E1E1E]">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-4 md:gap-8 md:px-10 md:py-8">
+        <div className="mx-auto flex max-w-6xl flex-col px-4 sm:px-6 md:px-10">
         <Header />
       </div>
 
-            <main className="mx-auto max-w-6xl px-6 md:px-10">
+            <main className="mx-auto max-w-6xl px-4 sm:px-6 md:px-10">
                 {/* Section 1: Introduction */}
-                <section className="mt-12 flex flex-col gap-10 md:mt-20 md:flex-row md:items-center md:gap-16">
+                <section className="mt-4 flex flex-col gap-10 md:mt-5 md:flex-row md:items-center md:gap-16">
                     <div className="md:w-1/2 space-y-6">
                         <p className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-[#007AFF] shadow-sm ring-1 ring-[#007AFF]/20">
                             <span className="h-1.5 w-1.5 rounded-full bg-[#007AFF]" />
@@ -41,7 +41,7 @@ export default function AboutPage() {
                 </section>
 
                 {/* Section 2: What We Do? (Blue Section) */}
-                <section className="mt-20 -mx-6 rounded-[32px] bg-[#007AFF] py-12 text-white md:-mx-10 md:py-16 md:px-10 px-6">
+                <section className="mt-12 -mx-4 rounded-[32px] bg-[#007AFF] py-10 text-white md:-mx-10 md:mt-16 md:py-14 md:px-10 px-6">
                     <div className="flex flex-col gap-10 md:flex-row md:items-start md:gap-12">
                         <div className="md:w-1/3">
                             <h2 className="text-2xl font-semibold leading-tight md:text-3xl lg:text-[32px]">
@@ -89,7 +89,7 @@ export default function AboutPage() {
                 </section>
 
                 {/* Section 3: About Us & Alphafind */}
-                <section className="mt-20 py-10">
+                <section className="mt-12 py-6 md:mt-16">
                     <div className="flex flex-col gap-10 md:flex-row md:items-start md:gap-16">
                         <div className="md:w-1/3">
                             <h2 className="text-2xl font-semibold tracking-tight text-[#1E1E1E] md:text-3xl lg:text-[32px]">
@@ -140,7 +140,7 @@ export default function AboutPage() {
                 </section>
 
                 {/* Call to Action */}
-                <section className="my-20 flex flex-col items-center text-center gap-6 rounded-[32px] bg-gray-50 py-16 px-6">
+                <section className="my-12 flex flex-col items-center text-center gap-6 rounded-[32px] bg-gray-50 py-12 px-6 md:my-16">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-[#007AFF]">
                         <Users className="h-6 w-6" />
                     </div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { CLOUDINARY_EAGER_TRANSFORMS } from "@/lib/cloudinary-image";
 
 const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
 const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
@@ -38,21 +39,36 @@ export async function POST(req: NextRequest) {
 
     const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
 
-    const uploadData = new FormData();
-    uploadData.append("file", file);
-    uploadData.append("upload_preset", uploadPreset);
-    if (apiKey) {
-      uploadData.append("api_key", apiKey);
-    } else {
+    const buildUpload = (withEager: boolean) => {
+      const uploadData = new FormData();
+      uploadData.append("file", file);
+      uploadData.append("upload_preset", uploadPreset);
+      if (apiKey) {
+        uploadData.append("api_key", apiKey);
+      }
+      if (withEager) {
+        uploadData.append("eager", CLOUDINARY_EAGER_TRANSFORMS);
+      }
+      return uploadData;
+    };
+
+    if (!apiKey) {
       console.warn("[admin/upload-logo] CLOUDINARY_API_KEY is not set; relying solely on unsigned preset.");
     }
 
-    const res = await fetch(cloudinaryUrl, {
+    let res = await fetch(cloudinaryUrl, {
       method: "POST",
-      body: uploadData,
+      body: buildUpload(true),
     });
+    let data = await res.json();
 
-    const data = await res.json();
+    if (!res.ok) {
+      res = await fetch(cloudinaryUrl, {
+        method: "POST",
+        body: buildUpload(false),
+      });
+      data = await res.json();
+    }
 
     if (!res.ok) {
       console.error("[admin/upload-logo] Cloudinary error", {

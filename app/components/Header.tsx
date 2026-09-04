@@ -14,7 +14,6 @@ import {
   CircleHelp,
   ClipboardCheck,
   FileStack,
-  FileCheck,
   GraduationCap,
   Home,
   Info,
@@ -100,20 +99,20 @@ function readLastPurchasesFromStorage(): {
 
 function TertiaryLogo() {
   return (
-        <Link href="/">
-          <Image
-            src="/hero/logoTguide.png"
-            alt="TertiaryGuide"
-            width={1080}
-            height={200}
-            priority
-            quality={100}
-            sizes="(max-width: 768px) 172px, 216px"
-            className="h-8 w-auto cursor-pointer md:h-10"
-          />
-        </Link>
-      );
-    }
+    <Link href="/" className="inline-flex bg-transparent">
+      <Image
+        src="/hero/logoTguide.png"
+        alt="TertiaryGuide"
+        width={1029}
+        height={163}
+        priority
+        quality={100}
+        sizes="(max-width: 768px) 172px, 216px"
+        className="h-8 w-auto bg-transparent object-contain cursor-pointer md:h-10"
+      />
+    </Link>
+  );
+}
 
 
 export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; showUserControls?: boolean } = {}) {
@@ -211,7 +210,8 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
       if (typeof window === "undefined") return;
       const onHome = window.location.pathname === "/";
       const tab = new URLSearchParams(window.location.search).get("tab");
-      setExploreTabActive(onHome && tab === "explore");
+      const onExplorePage = window.location.pathname === "/explore";
+      setExploreTabActive(onExplorePage || (onHome && tab === "explore"));
     };
 
     syncExploreTab();
@@ -641,19 +641,14 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
       label: "Apply",
       items: [
         {
-          name: "Direct Applications",
+          name: "Apply online",
           description: "Apply online through the TertiaryGuide portal",
           href: "/apply",
           icon: GraduationCap,
           match: (path) =>
-            path === "/apply" || path.startsWith("/apply/school/"),
-        },
-        {
-          name: "Application Portal",
-          description: "Continue or track an application in progress",
-          href: "/apply/portal",
-          icon: FileCheck,
-          match: (path) => path.startsWith("/apply/portal"),
+            path === "/apply" ||
+            path.startsWith("/apply/school/") ||
+            path.startsWith("/apply/portal"),
         },
       ],
     },
@@ -862,6 +857,16 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
           }
         >
           Home
+        </Link>
+        <Link
+          href="/explore"
+          className={
+            pathname === "/explore" || exploreTabActive
+              ? "text-[#007AFF]"
+              : "hover:text-[#007AFF]"
+          }
+        >
+          Explore
         </Link>
         <div ref={dropdownRef} className="relative">
           <button
@@ -1233,34 +1238,6 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
 
             {/* Scrollable nav */}
             <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
-              {!hideAuth && (showUserControls || isAuthed) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    setNotificationsOpen(true);
-                  }}
-                  className="mb-4 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] font-medium text-gray-700 transition hover:bg-gray-50 hover:text-[#007AFF] active:scale-[0.98]"
-                >
-                  <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-gray-500 ring-1 ring-gray-100">
-                    <Bell className="h-4 w-4" />
-                    {notificationCount > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#007AFF] px-1 text-[9px] font-semibold text-white">
-                        {notificationCount}
-                      </span>
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1 leading-snug">
-                    Notifications
-                  </span>
-                  {notificationCount > 0 && (
-                    <span className="rounded-full bg-[#007AFF]/10 px-2 py-0.5 text-[11px] font-semibold text-[#007AFF]">
-                      {notificationCount}
-                    </span>
-                  )}
-                </button>
-              )}
-
               {mobileNavSections.map((section) => (
                 <div
                   key={section.label ?? "main"}

@@ -7,9 +7,10 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Building2,
@@ -20,6 +21,20 @@ import {
 } from "lucide-react";
 import { Header } from "../../components/Header";
 import { Footer } from "../../components/Footer";
+import { programmeCompareHref } from "@/lib/school-links";
+
+type ProgrammeSearchResult = {
+  id: string;
+  name: string;
+  cutoff: string | null;
+  source?: "catalog" | "partner";
+  school: {
+    id?: string;
+    name: string;
+    alias: string | null;
+    isPartner?: boolean;
+  } | null;
+};
 
 type SchoolInfo = {
   id: string;
@@ -130,6 +145,7 @@ function getBuyHref(item: CompareItem | undefined) {
 }
 
 function ProgramCompareContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const programmeId = searchParams.get("programmeId") ?? "";
   const sourceParam = searchParams.get("source") ?? "";
@@ -141,6 +157,13 @@ function ProgramCompareContent() {
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
+  const [progQuery, setProgQuery] = useState("");
+  const [progResults, setProgResults] = useState<ProgrammeSearchResult[]>([]);
+  const [progLoading, setProgLoading] = useState(false);
+  const [progError, setProgError] = useState<string | null>(null);
+  const [progOpen, setProgOpen] = useState(false);
+  const progSearchRef = useRef<HTMLDivElement | null>(null);
+  const trimmedProgQuery = progQuery.trim();
 
   useEffect(() => {
     if (!programmeId) {
@@ -213,6 +236,72 @@ function ProgramCompareContent() {
     return () => document.removeEventListener("keydown", onKey);
   }, [pickerOpen]);
 
+  useEffect(() => {
+    if (!trimmedProgQuery) {
+      setProgResults([]);
+      setProgError(null);
+      setProgLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const handle = window.setTimeout(async () => {
+      try {
+        setProgLoading(true);
+        setProgError(null);
+        const params = new URLSearchParams({ query: trimmedProgQuery });
+        const res = await fetch(`/api/programmes/search?${params.toString()}`);
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to search programmes");
+        }
+        if (!cancelled) {
+          setProgResults(Array.isArray(data.results) ? data.results : []);
+          setProgOpen(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setProgError("Could not search programmes. Please try again.");
+          setProgOpen(true);
+        }
+      } finally {
+        if (!cancelled) setProgLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [trimmedProgQuery]);
+
+  useEffect(() => {
+    const onPointer = (event: MouseEvent) => {
+      if (!progSearchRef.current?.contains(event.target as Node)) {
+        setProgOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProgOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  const switchProgramme = useCallback(
+    (item: ProgrammeSearchResult) => {
+      setProgQuery("");
+      setProgResults([]);
+      setProgOpen(false);
+      router.push(programmeCompareHref(item));
+    },
+    [router],
+  );
+
   const removeFromCompare = useCallback((schoolId: string) => {
     setSelectedSchoolIds((prev) => {
       if (prev.length <= 1) return prev;
@@ -272,27 +361,120 @@ function ProgramCompareContent() {
   }, [visibleItems.length]);
 
   return (
-    <main className="mt-6 min-w-0 space-y-6 md:mt-10 md:space-y-8">
+    <main className="min-w-0 space-y-6 md:space-y-8">
       <section className="min-w-0 space-y-5 md:space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold leading-tight sm:text-3xl md:text-4xl">
-            {programmeName || "Programme Comparison"}
-          </h1>
-          {!loading && !error && allSchools.length > 0 && (
-            <p className="text-sm text-[#6B7280]">
-              Comparing{" "}
-              <span className="font-medium text-[#1E1E1E]">
-                {visibleItems.length}
-              </span>{" "}
-              of {allSchools.length} institutions
-              {offeringCount > 0 && (
-                <span className="text-[#9CA3AF]">
-                  {" "}
-                  · {offeringCount} offer this programme
-                </span>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
+            <h1 className="text-2xl font-semibold leading-tight sm:text-3xl md:text-4xl">
+              {programmeName || "Programme Comparison"}
+            </h1>
+            {!loading && !error && allSchools.length > 0 && (
+              <p className="text-sm text-[#6B7280]">
+                Comparing{" "}
+                <span className="font-medium text-[#1E1E1E]">
+                  {visibleItems.length}
+                </span>{" "}
+                of {allSchools.length} institutions
+                {offeringCount > 0 && (
+                  <span className="text-[#9CA3AF]">
+                    {" "}
+                    · {offeringCount} offer this programme
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
+
+          <div ref={progSearchRef} className="relative w-full shrink-0 sm:max-w-xs">
+            <label className="sr-only" htmlFor="compare-programme-search">
+              Search another programme
+            </label>
+            <div className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#F5F5F5] px-3 py-2 focus-within:border-[#007AFF]/40 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#007AFF]/10">
+              <Search className="h-4 w-4 shrink-0 text-[#9E9E9E]" aria-hidden />
+              <input
+                id="compare-programme-search"
+                type="text"
+                enterKeyHint="search"
+                value={progQuery}
+                onChange={(event) => {
+                  setProgQuery(event.target.value);
+                  setProgOpen(true);
+                }}
+                onFocus={() => {
+                  if (trimmedProgQuery) setProgOpen(true);
+                }}
+                placeholder="Search another programme"
+                autoComplete="off"
+                className="min-w-0 flex-1 bg-transparent text-sm text-[#1E1E1E] outline-none placeholder:text-[#9CA3AF]"
+              />
+              {progQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProgQuery("");
+                    setProgResults([]);
+                    setProgOpen(false);
+                  }}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#9CA3AF] hover:bg-[#E5E7EB] hover:text-[#111827]"
+                  aria-label="Clear programme search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               )}
-            </p>
-          )}
+            </div>
+
+            {progOpen && trimmedProgQuery.length > 0 && (
+              <div className="absolute z-30 mt-1.5 w-full overflow-hidden rounded-xl border border-[#E8EEF5] bg-white shadow-[0_12px_32px_rgba(15,23,42,0.12)]">
+                <div className="max-h-72 overflow-y-auto py-1">
+                  {progLoading ? (
+                    <p className="px-3 py-3 text-xs text-[#6B7280]">
+                      Searching programmes…
+                    </p>
+                  ) : progError ? (
+                    <p className="px-3 py-3 text-xs text-[#DC2626]">{progError}</p>
+                  ) : progResults.length === 0 ? (
+                    <p className="px-3 py-3 text-xs text-[#6B7280]">
+                      No programmes found. Try a different keyword.
+                    </p>
+                  ) : (
+                    progResults.map((item) => {
+                      const isCurrent =
+                        item.id === programmeId &&
+                        (item.source || "catalog") ===
+                          (sourceParam || "catalog");
+                      return (
+                        <button
+                          key={`${item.source || "catalog"}-${item.id}`}
+                          type="button"
+                          onClick={() => switchProgramme(item)}
+                          disabled={isCurrent}
+                          className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left transition hover:bg-[#F8FAFC] disabled:cursor-default disabled:bg-[#F8FAFC]"
+                        >
+                          <span className="text-sm font-semibold text-[#1E1E1E]">
+                            {item.name}
+                          </span>
+                          {item.school && (
+                            <span className="text-xs text-[#6B7280]">
+                              {item.school.name}
+                              {item.school.alias
+                                ? ` (${item.school.alias})`
+                                : ""}
+                              {isCurrent ? " · Current" : ""}
+                            </span>
+                          )}
+                          {item.cutoff && (
+                            <span className="text-[11px] text-[#9CA3AF]">
+                              Cut-off: {item.cutoff}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {loading && (
@@ -561,12 +743,12 @@ function ProgramCompareContent() {
 export default function ProgramComparePage() {
   return (
     <div className="min-h-screen bg-white text-[#1E1E1E]">
-      <div className="mx-auto flex min-w-0 max-w-6xl flex-col gap-6 px-4 py-4 sm:px-6 md:gap-8 md:px-10 md:py-8">
+      <div className="mx-auto flex min-w-0 max-w-6xl flex-col gap-4 px-4 pb-8 sm:px-6 md:gap-5 md:px-10 md:pb-10">
         <Header />
 
         <Suspense
           fallback={
-            <main className="mt-6 space-y-4 md:mt-10">
+            <main className="space-y-4">
               <h1 className="text-2xl font-semibold leading-tight sm:text-3xl md:text-4xl">
                 Programme Comparison
               </h1>

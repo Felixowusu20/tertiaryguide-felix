@@ -142,6 +142,12 @@ export async function GET(req: NextRequest) {
           alias: s.alias ?? null,
           logo: s.logoSrc ?? null,
           slug: s.slug ?? null,
+          deadline: s.deadline ? new Date(s.deadline).toISOString() : null,
+          brandColor: s.brandColor ?? null,
+          brandColors: Array.isArray(s.brandColors) ? s.brandColors : null,
+          phone: s.phone ?? null,
+          email: s.email ?? null,
+          address: s.address ?? null,
         },
       ]),
     );
@@ -175,6 +181,12 @@ export async function GET(req: NextRequest) {
         alias: null,
         logo: null,
         slug: null,
+        deadline: null,
+        brandColor: null,
+        brandColors: null,
+        phone: null,
+        email: null,
+        address: null,
       };
       const payment = v._id ? paymentByVoucherId.get(v._id.toHexString()) : null;
       const application = v._id
@@ -194,6 +206,12 @@ export async function GET(req: NextRequest) {
         schoolFullName: schoolInfo.name,
         schoolLogo: schoolInfo.logo,
         schoolSlug: schoolInfo.slug,
+        deadline: schoolInfo.deadline ?? null,
+        schoolBrandColor: schoolInfo.brandColor ?? null,
+        schoolBrandColors: schoolInfo.brandColors ?? null,
+        schoolPhone: schoolInfo.phone ?? null,
+        schoolEmail: schoolInfo.email ?? null,
+        schoolAddress: schoolInfo.address ?? null,
         date,
         voucher: {
           serial: v.serialNumber,
@@ -229,6 +247,12 @@ export async function GET(req: NextRequest) {
           alias: null,
           logo: null,
           slug: null,
+          deadline: null,
+          brandColor: null,
+          brandColors: null,
+          phone: null,
+          email: null,
+          address: null,
         };
         return {
           id: `pending-${p._id}`,
@@ -238,6 +262,12 @@ export async function GET(req: NextRequest) {
           schoolFullName: schoolInfo.name,
           schoolLogo: schoolInfo.logo,
           schoolSlug: schoolInfo.slug,
+          deadline: schoolInfo.deadline ?? null,
+          schoolBrandColor: schoolInfo.brandColor ?? null,
+          schoolBrandColors: schoolInfo.brandColors ?? null,
+          schoolPhone: schoolInfo.phone ?? null,
+          schoolEmail: schoolInfo.email ?? null,
+          schoolAddress: schoolInfo.address ?? null,
           date: p.paidAt || p.createdAt,
           voucher: null as { serial: string; pin: string } | null,
           programmeLevel: p.programmeLevel ?? "undergraduate",
@@ -275,6 +305,12 @@ export async function GET(req: NextRequest) {
         alias: school.alias ?? null,
         logo: school.logoSrc ?? null,
         slug: school.slug ?? null,
+        deadline: school.deadline ? new Date(school.deadline).toISOString() : null,
+        brandColor: school.brandColor ?? null,
+        brandColors: Array.isArray(school.brandColors) ? school.brandColors : null,
+        phone: school.phone ?? null,
+        email: school.email ?? null,
+        address: school.address ?? null,
       };
     }
     const standalonePartner = standaloneApps.map((application) => {
@@ -283,6 +319,12 @@ export async function GET(req: NextRequest) {
         alias: null,
         logo: null,
         slug: null,
+        deadline: null,
+        brandColor: null,
+        brandColors: null,
+        phone: null,
+        email: null,
+        address: null,
       };
       const detail = serializeApplication(application);
       return {
@@ -293,6 +335,12 @@ export async function GET(req: NextRequest) {
         schoolFullName: schoolInfo.name,
         schoolLogo: schoolInfo.logo,
         schoolSlug: schoolInfo.slug,
+        deadline: schoolInfo.deadline ?? null,
+        schoolBrandColor: schoolInfo.brandColor ?? null,
+        schoolBrandColors: schoolInfo.brandColors ?? null,
+        schoolPhone: schoolInfo.phone ?? null,
+        schoolEmail: schoolInfo.email ?? null,
+        schoolAddress: schoolInfo.address ?? null,
         date: application.submittedAt || application.updatedAt || new Date(),
         voucher: null as { serial: string; pin: string } | null,
         programmeLevel: "undergraduate" as const,

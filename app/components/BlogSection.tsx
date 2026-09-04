@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight, User } from "lucide-react";
 import { BlogAdLabel } from "@/app/components/BlogAdLabel";
+import { BlogPostImage } from "@/app/components/BlogPostImage";
 
 const HOMEPAGE_BLOG_LIMIT = 6;
 
@@ -83,21 +83,17 @@ export function BlogSection() {
                 <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#E8EEF5] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-md">
 
                   {/* Image */}
-                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#F3F4F6]">
-                    {post.featuredImageUrl ? (
-                      <Image
-                        src={post.featuredImageUrl}
-                        alt={post.title}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-zinc-400">
-                        No Image
-                      </div>
-                    )}
-                  </div>
+                  {post.featuredImageUrl ? (
+                    <BlogPostImage
+                      src={post.featuredImageUrl}
+                      alt={post.title}
+                      variant="card"
+                    />
+                  ) : (
+                    <div className="flex aspect-[16/10] w-full items-center justify-center bg-[#F3F4F6] text-xs text-zinc-400">
+                      No Image
+                    </div>
+                  )}
 
                   {/* Content */}
                   <div className="flex flex-1 flex-col px-4 py-4 sm:px-3 sm:py-3">

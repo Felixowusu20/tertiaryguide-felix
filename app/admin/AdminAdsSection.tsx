@@ -17,6 +17,9 @@ type SerializedAd = {
   videoUrl: string | null;
   targetUrl: string | null;
   ctaText: string;
+  advertiserName?: string;
+  advertiserEmail?: string;
+  campaignName?: string;
   isActive: boolean;
   startDate: string;
   endDate: string;
@@ -38,6 +41,9 @@ const emptyForm = {
   videoUrl: "",
   ctaText: "Learn more",
   targetUrl: "",
+  advertiserName: "",
+  advertiserEmail: "",
+  campaignName: "",
   isActive: true,
   startDate: "",
   endDate: "",
@@ -256,6 +262,9 @@ export function AdminAdsSection() {
       videoUrl: ad.videoUrl ?? "",
       ctaText: ad.ctaText,
       targetUrl: ad.targetUrl ?? "",
+      advertiserName: ad.advertiserName ?? "",
+      advertiserEmail: ad.advertiserEmail ?? "",
+      campaignName: ad.campaignName ?? "",
       isActive: ad.isActive,
       startDate: toDatetimeLocalValue(ad.startDate),
       endDate: toDatetimeLocalValue(ad.endDate),
@@ -402,6 +411,9 @@ export function AdminAdsSection() {
       videoUrl: form.videoUrl.trim() || null,
       ctaText: form.ctaText.trim() || "Learn more",
       targetUrl: form.targetUrl.trim() || null,
+      advertiserName: form.advertiserName.trim() || null,
+      advertiserEmail: form.advertiserEmail.trim() || null,
+      campaignName: form.campaignName.trim() || null,
       isActive: form.isActive,
       startDate: start.toISOString(),
       endDate: end.toISOString(),
@@ -827,6 +839,48 @@ export function AdminAdsSection() {
                     placeholder="/university-forms"
                   />
                 </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[#4B5563]">
+                    Advertiser name
+                  </label>
+                  <input
+                    value={form.advertiserName}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, advertiserName: e.target.value }))
+                    }
+                    className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
+                    placeholder="School or brand"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[#4B5563]">
+                    Advertiser email
+                  </label>
+                  <input
+                    type="email"
+                    value={form.advertiserEmail}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, advertiserEmail: e.target.value }))
+                    }
+                    className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
+                    placeholder="owner@email.com"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-[#4B5563]">
+                  Campaign name
+                </label>
+                <input
+                  value={form.campaignName}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, campaignName: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]"
+                  placeholder="2026 admissions flyer"
+                />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1">

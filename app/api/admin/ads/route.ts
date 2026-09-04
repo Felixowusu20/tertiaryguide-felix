@@ -3,6 +3,7 @@ import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import type { AdDoc } from "@/lib/ads";
 import { serializeAdDoc } from "@/lib/ads";
+import { parseOptionalEmail, parseOptionalText } from "@/lib/ad-analytics";
 import { resolveStoredAdImageUrl } from "@/lib/adVideo";
 
 export async function GET() {
@@ -86,6 +87,9 @@ export async function POST(req: NextRequest) {
       videoUrl,
       targetUrl,
       ctaText,
+      advertiserName: parseOptionalText(body.advertiserName),
+      advertiserEmail: parseOptionalEmail(body.advertiserEmail),
+      campaignName: parseOptionalText(body.campaignName),
       isActive: typeof body.isActive === "boolean" ? body.isActive : true,
       startDate: start,
       endDate: end,

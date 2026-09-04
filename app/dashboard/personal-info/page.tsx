@@ -199,7 +199,7 @@ export default function PersonalInfoPage() {
       </div>
 
       <div className="space-y-1">
-        <h2 className="text-xl font-semibold leading-tight">Personal Info</h2>
+        <h2 className="text-xl font-semibold leading-tight">Profile</h2>
         <p className="text-sm text-[#555555]">
           Modify your username, phone number, and email
         </p>

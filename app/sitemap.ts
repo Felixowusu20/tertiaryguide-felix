@@ -5,6 +5,7 @@ import { getSiteUrl } from "@/lib/site-url";
 const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[0]["changeFrequency"]; priority: number }[] = [
   { path: "", changeFrequency: "weekly", priority: 1 },
   { path: "/blog", changeFrequency: "daily", priority: 0.9 },
+  { path: "/explore", changeFrequency: "daily", priority: 0.8 },
   { path: "/about", changeFrequency: "monthly", priority: 0.6 },
   { path: "/contact", changeFrequency: "monthly", priority: 0.6 },
   { path: "/faqs", changeFrequency: "monthly", priority: 0.6 },

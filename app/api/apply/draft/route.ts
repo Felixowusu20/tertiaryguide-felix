@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "../../../../lib/mongodb";
 import { findSchoolById } from "../../../../lib/admissions/schools";
-import { loginWithVoucher } from "../../../../lib/admissions/vouchers";
+import { deadlineToIso, loginWithVoucher } from "../../../../lib/admissions/vouchers";
+import { isDeadlineCalendarExpired } from "../../../../lib/deadlines";
 import {
   applicationDraftsCollection,
   ensureDraftIndexes,
@@ -68,6 +69,15 @@ export async function POST(req: NextRequest) {
     const school = await findSchoolById(db, schoolId);
     if (!school?.isPartner) {
       return NextResponse.json({ error: "School not available" }, { status: 404 });
+    }
+    if (isDeadlineCalendarExpired(deadlineToIso(school.deadline))) {
+      return NextResponse.json(
+        {
+          error:
+            "The application deadline for this school has passed. Drafts can no longer be saved.",
+        },
+        { status: 400 },
+      );
     }
 
     let voucherId: ObjectId | null = null;

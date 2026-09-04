@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
           name: school.name,
           slug: school.slug ?? null,
           brandColor: school.brandColor ?? null,
+          deadline: school.deadline ?? null,
         },
       }),
     });

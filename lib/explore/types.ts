@@ -35,6 +35,9 @@ export type ExplorePostDoc = {
   media: ExploreMedia[];
   featuredSchool?: ExploreFeaturedSchool | null;
   isSponsored: boolean;
+  advertiserName?: string | null;
+  advertiserEmail?: string | null;
+  campaignName?: string | null;
   status: "Draft" | "Published";
   likes: string[];
   likeCount: number;
@@ -59,6 +62,7 @@ export type ExploreCommentDoc = {
 export function serializeExplorePost(
   doc: ExplorePostDoc,
   viewerEmail?: string | null,
+  opts?: { includeAdvertiser?: boolean },
 ) {
   const id = doc._id ? String(doc._id) : "";
   const likes = Array.isArray(doc.likes) ? doc.likes : [];
@@ -73,6 +77,15 @@ export function serializeExplorePost(
     media: Array.isArray(doc.media) ? doc.media : [],
     featuredSchool: doc.featuredSchool ?? null,
     isSponsored: doc.isSponsored === true,
+    advertiserName: opts?.includeAdvertiser
+      ? doc.advertiserName?.trim() || ""
+      : undefined,
+    advertiserEmail: opts?.includeAdvertiser
+      ? doc.advertiserEmail?.trim() || ""
+      : undefined,
+    campaignName: opts?.includeAdvertiser
+      ? doc.campaignName?.trim() || ""
+      : undefined,
     status: doc.status,
     likeCount: typeof doc.likeCount === "number" ? doc.likeCount : likes.length,
     commentCount: doc.commentCount ?? 0,

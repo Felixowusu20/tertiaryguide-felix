@@ -202,7 +202,7 @@ export default function SchoolDetailsPage() {
 
   return (
     <div className="min-h-screen bg-white text-[#1E1E1E]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-4 md:px-10 md:py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-8 sm:px-6 md:gap-5 md:px-10 md:pb-10">
         <Header />
 
         <AuthModal
@@ -221,7 +221,7 @@ export default function SchoolDetailsPage() {
           />
         )}
 
-        <main className="mt-10 flex flex-col gap-10 md:mt-16 md:flex-row md:items-start md:justify-between">
+        <main className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
           <section className="max-w-2xl space-y-6 text-sm leading-relaxed md:text-base">
             {loading ? (
               <h1 className="text-3xl font-semibold leading-tight md:text-4xl">
