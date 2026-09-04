@@ -1,3 +1,4 @@
+import { certificateNameOrder } from "@/lib/admissions/declaration";
 import type { RankedProgrammeChoice } from "@/lib/admissions/programme-choices";
 import type { ApplicationFormState } from "@/lib/admissions/form-schema";
 
@@ -26,6 +27,7 @@ export type PrintExamSitting = PrintRecord & {
 export type ApplicationPrintoutData = {
   applicationNumber?: string;
   photoUrl?: string | null;
+  declarationName: string;
   personal: PrintField[];
   guardian: PrintField[];
   programmes: PrintProgramme[];
@@ -191,6 +193,7 @@ export function printoutFromDetail(
       detail?.documents?.passportPhoto ||
       personal.passportPhoto ||
       null,
+    declarationName: certificateNameOrder(personal),
     personal: compact([
       kv("Applicant ID", detail?.applicationNumber),
       kv("Title", personal.title),
@@ -312,6 +315,7 @@ export function printoutFromForm(
   return {
     applicationNumber,
     photoUrl: form.documents.passportPhoto || null,
+    declarationName: certificateNameOrder(form.personal),
     personal: compact([
       kv("Applicant ID", applicationNumber),
       kv("Title", form.personal.title),

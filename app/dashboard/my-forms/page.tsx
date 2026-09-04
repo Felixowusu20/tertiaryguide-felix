@@ -49,7 +49,7 @@ export default function MyFormsDashboardPage() {
       if (!email) {
         setError("User email not found. Please log in.");
         setLoading(false);
-        return;
+        return [] as Purchase[];
       }
 
       const res = await fetch(`/api/user/purchases?email=${encodeURIComponent(email)}`);
@@ -62,11 +62,13 @@ export default function MyFormsDashboardPage() {
         );
         setPurchases(filtered);
         setError(null);
-      } else {
-        setError(data.error || "Failed to fetch purchases.");
+        return filtered as Purchase[];
       }
+      setError(data.error || "Failed to fetch purchases.");
+      return [] as Purchase[];
     } catch {
       setError("Something went wrong. Please try again.");
+      return [] as Purchase[];
     } finally {
       setLoading(false);
     }
@@ -74,22 +76,85 @@ export default function MyFormsDashboardPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const email = window.localStorage.getItem("tg_user_email");
-    if (!email) {
-      router.replace(
-        `/signin?redirect=${encodeURIComponent("/dashboard/my-forms")}`,
-      );
-      return;
+    let cancelled = false;
+
+    async function boot() {
+      const params = new URLSearchParams(window.location.search);
+      const reference = params.get("reference")?.trim();
+      const from = params.get("from");
+
+      if (reference) {
+        setLoading(true);
+        const partnerUrl = `/api/apply/voucher/verify?reference=${encodeURIComponent(reference)}`;
+        const formUrl = `/api/payments/forms/verify?reference=${encodeURIComponent(reference)}`;
+        const endpoints =
+          from === "partner"
+            ? [partnerUrl, formUrl]
+            : from === "form"
+              ? [formUrl, partnerUrl]
+              : [formUrl, partnerUrl];
+
+        let verifiedEmail: string | null = null;
+        let highlightSerial: string | null = null;
+
+        for (const url of endpoints) {
+          try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!res.ok) continue;
+            verifiedEmail =
+              typeof data.email === "string" ? data.email.trim().toLowerCase() : null;
+            highlightSerial =
+              data.voucher?.serial ||
+              data.voucher?.serialNumber ||
+              null;
+            break;
+          } catch {
+            // try the next verify endpoint
+          }
+        }
+
+        if (verifiedEmail) {
+          window.localStorage.setItem("tg_user_email", verifiedEmail);
+        }
+
+        window.history.replaceState({}, "", "/dashboard/my-forms");
+        window.dispatchEvent(new CustomEvent("tg-purchases-updated"));
+
+        const list = cancelled ? [] : await fetchPurchases();
+        if (!cancelled && highlightSerial) {
+          const match = list.find(
+            (p) => p.voucher?.serial === highlightSerial,
+          );
+          if (match) {
+            setFlippedIds(new Set([match.id]));
+          }
+        }
+        return;
+      }
+
+      const email = window.localStorage.getItem("tg_user_email");
+      if (!email) {
+        router.replace(
+          `/signin?redirect=${encodeURIComponent("/dashboard/my-forms")}`,
+        );
+        return;
+      }
+
+      void fetchPurchases();
     }
 
-    void fetchPurchases();
+    void boot();
 
     const handleUpdate = () => {
       void fetchPurchases();
     };
 
     window.addEventListener("tg-purchases-updated", handleUpdate);
-    return () => window.removeEventListener("tg-purchases-updated", handleUpdate);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("tg-purchases-updated", handleUpdate);
+    };
   }, [router]);
 
   const copyToClipboard = (
@@ -199,7 +264,7 @@ export default function MyFormsDashboardPage() {
   function statusLabel(purchase: Purchase) {
     if (purchase.status === "pending") return "Pending voucher";
     if (purchase.type === "partner_voucher") return "Ready to apply";
-    return "Active";
+    return "Voucher ready";
   }
 
   if (loading) {
@@ -340,8 +405,8 @@ export default function MyFormsDashboardPage() {
           </span>
           <h2 className="mb-2 text-xl font-bold text-[#1E1E1E]">No vouchers yet</h2>
           <p className="mb-8 max-w-sm text-sm text-[#555555]">
-            Buy a university form or a direct-application voucher and it will
-            show up here.
+            Buy a university form and the voucher will show up here. Secured
+            schools also let you apply online from this page.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -354,7 +419,7 @@ export default function MyFormsDashboardPage() {
               href="/apply"
               className="rounded-full border border-[#007AFF] px-8 py-3 text-sm font-medium text-[#007AFF] transition hover:bg-[#EFF6FF]"
             >
-              Apply online
+              Secured schools
             </Link>
           </div>
         </div>
@@ -429,7 +494,7 @@ export default function MyFormsDashboardPage() {
                             </span>
                           </div>
                           <p className="text-[10px] font-bold uppercase tracking-wider text-black/40">
-                            {isPartner ? "Direct apply" : "University form"}
+                            {isPartner ? "Secured school" : "University form"}
                           </p>
                           <h2 className="mt-1 text-xl font-bold leading-tight text-[#1E1E1E]">
                             {purchase.schoolName || "School form"}
@@ -556,7 +621,7 @@ export default function MyFormsDashboardPage() {
                               ) : (
                                 <ExternalLink className="h-3.5 w-3.5" />
                               )}
-                              Open application
+                              Apply online
                             </button>
                           ) : null}
 

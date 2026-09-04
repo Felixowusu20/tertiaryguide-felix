@@ -46,7 +46,10 @@ export function FileDropzone({
       const ext = `.${file.name.split(".").pop()?.toLowerCase() || ""}`;
       const typeOk =
         allowed.some((a) => a === file.type || a === ext) ||
-        allowed.some((a) => a.endsWith("/*") && file.type.startsWith(a.replace("/*", "/")));
+        allowed.some(
+          (a) =>
+            a.endsWith("/*") && file.type.startsWith(a.replace("/*", "/")),
+        );
 
       if (!typeOk) {
         setLocalError(`Invalid file type. Allowed: ${accept}`);
@@ -80,7 +83,9 @@ export function FileDropzone({
     <div className="space-y-1.5">
       <p className="text-sm font-medium text-[#334155]">
         {label}
-        {required ? <span className="text-red-500"> *</span> : null}
+        {required ? (
+          <span className="text-[11px] font-semibold text-[#EF4444]"> *</span>
+        ) : null}
       </p>
       <div
         onDragOver={(e) => {
@@ -94,21 +99,21 @@ export function FileDropzone({
           const file = e.dataTransfer.files?.[0];
           if (file) void upload(file);
         }}
-        className={`rounded-2xl border-2 border-dashed px-4 py-6 text-center transition ${
+        className={`rounded-2xl border border-dashed px-4 py-7 text-center transition ${
           dragging
             ? "border-[var(--school-brand,#007AFF)] bg-[var(--school-brand-soft,#EFF6FF)]"
             : error || localError
-              ? "border-red-300 bg-red-50/40"
-              : "border-[#CBD5E1] bg-[#F8FAFC]"
+              ? "border-red-300 bg-red-50/50"
+              : "border-[#D6DEE8] bg-[#F8FAFC] hover:border-[#B6C3D4] hover:bg-white"
         }`}
       >
         {value ? (
           <div className="space-y-3">
             {preview === "photo" || isImageUrl(value) ? (
               <div
-                className={`mx-auto overflow-hidden border border-[#111827] bg-white ${
+                className={`mx-auto overflow-hidden border border-[#E2E8F0] bg-white shadow-sm ${
                   preview === "photo"
-                    ? "h-40 w-32"
+                    ? "h-40 w-32 rounded-xl"
                     : "h-28 w-full max-w-[220px] rounded-xl"
                 }`}
               >
@@ -120,26 +125,26 @@ export function FileDropzone({
                 />
               </div>
             ) : null}
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2">
               <a
                 href={value}
                 target="_blank"
                 rel="noreferrer"
-                className="truncate text-sm text-[var(--school-brand,#007AFF)] underline"
+                className="truncate text-sm font-medium text-[var(--school-brand,#007AFF)] underline underline-offset-2"
               >
-                {isImageUrl(value) ? "View photo" : "Uploaded file ✓"}
+                {isImageUrl(value) ? "View file" : "Uploaded file ✓"}
               </a>
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                className="inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium text-[#334155]"
+                className="inline-flex items-center rounded-full border border-[#E2E8F0] bg-white px-3 py-1.5 text-xs font-semibold text-[#334155] shadow-sm hover:bg-[#F8FAFC]"
               >
                 Replace
               </button>
               <button
                 type="button"
                 onClick={onClear}
-                className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-[#64748B]"
+                className="inline-flex items-center gap-1 rounded-full border border-[#E2E8F0] bg-white px-3 py-1.5 text-xs font-medium text-[#64748B] hover:bg-[#FEF2F2] hover:text-[#B91C1C]"
               >
                 <X className="h-3 w-3" /> Remove
               </button>
@@ -150,18 +155,20 @@ export function FileDropzone({
             type="button"
             disabled={busy}
             onClick={() => inputRef.current?.click()}
-            className="inline-flex flex-col items-center gap-2 text-sm text-[#64748B]"
+            className="inline-flex w-full flex-col items-center gap-2 text-sm text-[#64748B]"
           >
-            {busy ? (
-              <Loader2 className="h-6 w-6 animate-spin text-[var(--school-brand,#007AFF)]" />
-            ) : (
-              <FileUp className="h-6 w-6 text-[var(--school-brand,#007AFF)]" />
-            )}
-            <span>
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[var(--school-brand,#007AFF)] shadow-sm ring-1 ring-[#E8EEF5]">
+              {busy ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <FileUp className="h-5 w-5" />
+              )}
+            </span>
+            <span className="font-medium text-[#334155]">
               {busy ? "Uploading…" : "Drag & drop or click to upload"}
             </span>
             <span className="text-xs text-[#94A3B8]">
-              Max {maxMb}MB · {accept}
+              Max {maxMb}MB · {accept.split(",").join(" · ")}
             </span>
           </button>
         )}
@@ -177,7 +184,9 @@ export function FileDropzone({
         />
       </div>
       {(localError || error) && (
-        <p className="text-xs text-red-600">{localError || error}</p>
+        <p className="text-xs font-medium text-[#DC2626]">
+          {localError || error}
+        </p>
       )}
     </div>
   );

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
-  ClipboardList,
   GraduationCap,
   Loader2,
   LogOut,
@@ -23,6 +22,7 @@ import {
   listProgrammeChoices,
   type RankedProgrammeChoice,
 } from "@/lib/admissions/programme-choices";
+import { controlClass } from "../components/FormControls";
 
 const SESSION_KEY = "tg_applicant_session";
 
@@ -243,7 +243,7 @@ function ApplicantPortalContent() {
 
   if (!authReady) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F9FC]">
         <Loader2 className="h-6 w-6 animate-spin text-[#007AFF]" />
       </main>
     );
@@ -251,67 +251,74 @@ function ApplicantPortalContent() {
 
   return (
     <div
-      className="min-h-screen bg-[#F8FAFC] text-[#050816]"
+      className="min-h-screen bg-[#F7F9FC] text-[#0F172A]"
       style={themeStyle}
     >
       <Header />
-      <main className="mx-auto max-w-5xl px-4 pt-4 pb-10 sm:px-6 md:pt-5">
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--school-brand,#007AFF)] text-white shadow-lg shadow-[var(--school-brand,#007AFF)]/20">
-              <ClipboardList className="h-6 w-6" />
-            </span>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94A3B8]">
-                Student portal
-              </p>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                My application
-              </h1>
-              <p className="mt-1 text-sm text-[#6B7280]">
-                Check status, review your chosen programmes, and edit while the
-                school is still reviewing.
-              </p>
-            </div>
+      <main className="relative mx-auto max-w-5xl px-4 pb-12 pt-5 sm:px-6 md:pb-16 md:pt-8">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-56 bg-[radial-gradient(ellipse_at_top,color-mix(in_srgb,var(--school-brand,#007AFF)_12%,transparent),transparent_70%)]"
+        />
+
+        <header className="mb-8 flex flex-col gap-5 border-b border-[#E8EEF5] pb-6 sm:mb-10 sm:flex-row sm:items-end sm:justify-between sm:pb-8">
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--school-brand,#007AFF)]">
+              Student portal
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#0F172A] sm:text-4xl">
+              My application
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#64748B] sm:text-[15px]">
+              Check your status, review programme choices, and edit while the
+              school is still reviewing.
+            </p>
           </div>
-          {session && (
+          {session ? (
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-xs font-medium sm:self-center"
+              className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 self-start rounded-full border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-medium text-[#475569] shadow-sm transition hover:border-[#CBD5E1] hover:bg-[#F8FAFC] sm:self-auto"
             >
-              <LogOut className="h-3.5 w-3.5" /> Log out
+              <LogOut className="h-4 w-4" />
+              Log out
             </button>
-          )}
-        </div>
+          ) : null}
+        </header>
 
-        {error && (
-          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {error ? (
+          <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
-        )}
-        {message && (
-          <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        ) : null}
+        {message ? (
+          <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             {message}
           </div>
-        )}
+        ) : null}
 
         {!session ? (
-          <section className="overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
-            <div className="bg-gradient-to-br from-[#EFF6FF] to-white px-6 py-5">
-              <h2 className="text-lg font-semibold">Student voucher login</h2>
-              <p className="mt-1 text-sm text-[#6B7280]">
-                Use the same serial number and PIN from your payment email.
+          <section className="mx-auto max-w-xl overflow-hidden rounded-[28px] border border-[#E8EEF5] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+            <div className="border-b border-[#EEF2F7] px-6 py-6 sm:px-8">
+              <h2 className="text-xl font-semibold tracking-tight text-[#0F172A]">
+                Sign in with your voucher
+              </h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-[#64748B]">
+                Enter the school, serial number, and PIN from your payment email
+                or My Forms.
               </p>
             </div>
-            <form onSubmit={handleLogin} className="grid gap-4 px-6 py-6 sm:grid-cols-2">
-              <label className="space-y-1 text-sm sm:col-span-2">
-                <span className="font-medium">School</span>
+            <form
+              onSubmit={handleLogin}
+              className="grid gap-4 px-6 py-6 sm:grid-cols-2 sm:px-8"
+            >
+              <label className="space-y-1.5 text-sm sm:col-span-2">
+                <span className="font-medium text-[#334155]">School</span>
                 <select
                   required
                   value={schoolId}
                   onChange={(e) => setSchoolId(e.target.value)}
-                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2.5 outline-none focus:border-[var(--school-brand,#007AFF)]"
+                  className={controlClass}
                 >
                   <option value="">Select school</option>
                   {schools.map((s) => (
@@ -321,70 +328,99 @@ function ApplicantPortalContent() {
                   ))}
                 </select>
               </label>
-              <label className="space-y-1 text-sm">
-                <span className="font-medium">Serial number</span>
+              <label className="space-y-1.5 text-sm">
+                <span className="font-medium text-[#334155]">Serial number</span>
                 <input
                   required
                   value={serialNumber}
-                  onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
-                  className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 font-mono text-[#111827] caret-[#111827] outline-none placeholder:text-[#9CA3AF] focus:border-[var(--school-brand,#007AFF)]"
+                  onChange={(e) =>
+                    setSerialNumber(e.target.value.toUpperCase())
+                  }
+                  className={`${controlClass} font-mono`}
                   placeholder="TG-2026-001234"
                 />
               </label>
-              <label className="space-y-1 text-sm">
-                <span className="font-medium">PIN</span>
+              <label className="space-y-1.5 text-sm">
+                <span className="font-medium text-[#334155]">PIN</span>
                 <input
                   required
                   value={voucherCode}
                   onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                  className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 font-mono text-[#111827] caret-[#111827] outline-none placeholder:text-[#9CA3AF] focus:border-[var(--school-brand,#007AFF)]"
+                  className={`${controlClass} font-mono`}
                   placeholder="HS-8K7D-29PX"
                 />
               </label>
               <button
                 type="submit"
                 disabled={busy}
-                className="rounded-full bg-[var(--school-brand,#007AFF)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)] disabled:opacity-60 sm:col-span-2"
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--school-brand,#007AFF)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--school-brand-hover,#0062CC)] disabled:opacity-60 sm:col-span-2"
               >
-                {busy ? "Signing in…" : "Sign in"}
+                {busy ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Signing in…
+                  </span>
+                ) : (
+                  "Continue"
+                )}
               </button>
             </form>
-            <p className="border-t border-[#F1F5F9] px-6 py-4 text-center text-sm text-[#6B7280]">
+            <div className="border-t border-[#F1F5F9] bg-[#FCFCFD] px-6 py-4 text-center text-sm text-[#64748B] sm:px-8">
               Don’t have a form yet?{" "}
               {activeSchool ? (
                 <Link
                   href={partnerSchoolBuyFormsHref(activeSchool)}
-                  className="font-semibold text-[var(--school-brand,#007AFF)] underline"
+                  className="font-semibold text-[var(--school-brand,#007AFF)] underline underline-offset-2"
                 >
                   Buy new forms
                 </Link>
               ) : (
                 <Link
                   href="/apply"
-                  className="font-semibold text-[var(--school-brand,#007AFF)] underline"
+                  className="font-semibold text-[var(--school-brand,#007AFF)] underline underline-offset-2"
                 >
                   Choose a school
                 </Link>
               )}
-            </p>
+            </div>
           </section>
         ) : (
-          <div className="space-y-6">
-            <section className="overflow-hidden rounded-[28px] border border-[#E8EEF5] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-              <div className="bg-gradient-to-br from-[var(--school-brand-soft,#DBEAFE)] to-white px-6 py-6">
-                <p className="text-sm font-medium text-[#64748B]">{session.schoolName}</p>
-                {session.application ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <h2 className="text-xl font-semibold tracking-tight">
-                      {session.application.fullName}
-                    </h2>
-                  </div>
-                ) : (
-                  <h2 className="mt-1 text-xl font-semibold">Application not submitted</h2>
-                )}
+          <div className="space-y-5 sm:space-y-6">
+            <section className="overflow-hidden rounded-[28px] border border-[#E8EEF5] bg-white shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
+              <div className="relative overflow-hidden border-b border-[#EEF2F7] px-5 py-6 sm:px-7 sm:py-7">
+                <div
+                  aria-hidden
+                  className="absolute inset-0 bg-gradient-to-br from-[var(--school-brand-soft,#EFF6FF)] via-white to-white"
+                />
+                <div className="relative">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#64748B]">
+                    {session.schoolName}
+                  </p>
+                  {session.application ? (
+                    <>
+                      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#0F172A]">
+                        {session.application.fullName}
+                      </h2>
+                      <p className="mt-1 text-sm text-[#64748B]">
+                        Application overview and current review status
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#0F172A]">
+                        Application not submitted
+                      </h2>
+                      <p className="mt-1 text-sm text-[#64748B]">
+                        Your voucher is verified. Finish the form to send it to
+                        the school.
+                      </p>
+                    </>
+                  )}
+                </div>
               </div>
+
               {session.application ? (
-                <div className="space-y-6 px-6 py-6">
+                <div className="space-y-6 px-5 py-6 sm:px-7 sm:py-7">
                   <ApplicationStatusCard
                     status={session.application.status}
                     schoolName={session.schoolName}
@@ -392,35 +428,41 @@ function ApplicantPortalContent() {
                   />
 
                   <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl bg-[#F8FAFC] px-4 py-3">
-                      <dt className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
+                    <div className="rounded-2xl border border-[#EEF2F7] bg-[#F8FAFC] px-4 py-3.5">
+                      <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
                         Application number
                       </dt>
-                      <dd className="mt-1 truncate font-mono text-sm font-semibold">
+                      <dd className="mt-1.5 truncate font-mono text-sm font-semibold text-[#0F172A]">
                         {session.application.applicationNumber}
                       </dd>
                     </div>
-                    <div className="rounded-2xl bg-[#F8FAFC] px-4 py-3">
-                      <dt className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
+                    <div className="rounded-2xl border border-[#EEF2F7] bg-[#F8FAFC] px-4 py-3.5">
+                      <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
                         Submitted
                       </dt>
-                      <dd className="mt-1 text-sm font-medium">
-                        {new Date(session.application.submittedAt).toLocaleString()}
+                      <dd className="mt-1.5 text-sm font-medium text-[#0F172A]">
+                        {new Date(
+                          session.application.submittedAt,
+                        ).toLocaleString()}
                       </dd>
                     </div>
-                    <div className="rounded-2xl bg-[#F8FAFC] px-4 py-3">
-                      <dt className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
+                    <div className="rounded-2xl border border-[#EEF2F7] bg-[#F8FAFC] px-4 py-3.5">
+                      <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
                         Last updated
                       </dt>
-                      <dd className="mt-1 text-sm font-medium">
-                        {new Date(session.application.updatedAt).toLocaleString()}
+                      <dd className="mt-1.5 text-sm font-medium text-[#0F172A]">
+                        {new Date(
+                          session.application.updatedAt,
+                        ).toLocaleString()}
                       </dd>
                     </div>
                   </dl>
 
-                  <div className="rounded-[24px] border border-[#EEF2F7] bg-[#F8FBFF] p-4 sm:p-5">
+                  <div className="rounded-[24px] border border-[#E8EEF5] bg-[#FCFCFD] p-4 sm:p-5">
                     <div className="mb-4 flex items-center gap-2">
-                      <GraduationCap className="h-4 w-4 text-[var(--school-brand,#007AFF)]" />
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--school-brand-soft,#EFF6FF)] text-[var(--school-brand,#007AFF)]">
+                        <GraduationCap className="h-4 w-4" />
+                      </span>
                       <h3 className="text-sm font-semibold text-[#0F172A]">
                         Chosen programmes
                       </h3>
@@ -436,8 +478,9 @@ function ApplicantPortalContent() {
                     documents={session.application.documents}
                     applicationNumber={session.application.applicationNumber}
                   />
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                    {session.canEdit && (
+
+                  <div className="flex flex-col gap-2 border-t border-[#F1F5F9] pt-5 sm:flex-row sm:flex-wrap sm:items-center">
+                    {session.canEdit ? (
                       <button
                         type="button"
                         onClick={() =>
@@ -445,43 +488,60 @@ function ApplicantPortalContent() {
                             `/apply?school=${session.schoolSlug || session.schoolId}&step=form&voucherCode=${encodeURIComponent(session.voucherCode)}&serialNumber=${encodeURIComponent(session.serialNumber)}`,
                           )
                         }
-                        className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--school-brand,#007AFF)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)]"
+                        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-[var(--school-brand,#007AFF)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--school-brand-hover,#0062CC)]"
                       >
                         <Pencil className="h-4 w-4" />
                         Edit application
                       </button>
-                    )}
-                    {!session.canEdit && (
-                      <p className="self-center text-sm text-[#6B7280]">
+                    ) : (
+                      <p className="text-sm text-[#64748B]">
                         This application is no longer open for edits.
                       </p>
                     )}
                     <Link
                       href="/dashboard/my-forms"
-                      className="inline-flex items-center justify-center rounded-full border border-[#E2E8F0] px-4 py-2 text-sm font-medium text-[#334155]"
+                      className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#E2E8F0] bg-white px-5 py-2.5 text-sm font-semibold text-[#334155] shadow-sm transition hover:bg-[#F8FAFC]"
                     >
                       Back to My Forms
                     </Link>
                   </div>
                 </div>
               ) : (
-                <div className="px-6 py-6">
-                  <div className="flex items-center gap-2 text-amber-700">
-                    <CheckCircle2 className="h-5 w-5" />
-                    <p className="font-medium">No application submitted yet</p>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        router.push(
-                          `/apply?school=${session.schoolSlug || session.schoolId}&step=form&voucherCode=${encodeURIComponent(session.voucherCode)}&serialNumber=${encodeURIComponent(session.serialNumber)}`,
-                        )
-                      }
-                      className="rounded-full bg-[var(--school-brand,#007AFF)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--school-brand-hover,#0062CC)]"
-                    >
-                      Complete application form
-                    </button>
+                <div className="px-5 py-7 sm:px-7">
+                  <div className="rounded-[24px] border border-amber-200 bg-gradient-to-br from-amber-50 to-white px-5 py-6">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm ring-1 ring-amber-100">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </span>
+                      <div>
+                        <p className="font-semibold text-[#92400E]">
+                          Ready to complete your application
+                        </p>
+                        <p className="mt-1 text-sm leading-relaxed text-[#B45309]">
+                          Your voucher is active. Fill in the application form
+                          to submit it to {session.schoolName}.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            `/apply?school=${session.schoolSlug || session.schoolId}&step=form&voucherCode=${encodeURIComponent(session.voucherCode)}&serialNumber=${encodeURIComponent(session.serialNumber)}`,
+                          )
+                        }
+                        className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--school-brand,#007AFF)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--school-brand-hover,#0062CC)]"
+                      >
+                        Complete application form
+                      </button>
+                      <Link
+                        href="/dashboard/my-forms"
+                        className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#E2E8F0] bg-white px-5 py-2.5 text-sm font-semibold text-[#334155]"
+                      >
+                        Back to My Forms
+                      </Link>
+                    </div>
                   </div>
                 </div>
               )}

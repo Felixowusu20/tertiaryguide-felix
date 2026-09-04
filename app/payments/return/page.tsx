@@ -3,14 +3,14 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { Header } from "../../../components/Header";
-import { Footer } from "../../../components/Footer";
+import { Header } from "../../components/Header";
+import { Footer } from "../../components/Footer";
 
 /**
- * Legacy Paystack callback for older transactions.
- * Verifies payment then sends the buyer to My Forms.
+ * Public Paystack return URL (no dashboard auth).
+ * Verifies payment, stores buyer email, then sends the user to My Forms.
  */
-function UniversityFormSuccessContent() {
+function PaymentReturnContent() {
   const searchParams = useSearchParams();
   const reference =
     searchParams.get("reference")?.trim() ||
@@ -21,49 +21,64 @@ function UniversityFormSuccessContent() {
 
   useEffect(() => {
     if (!reference) {
-      setError("Missing payment reference.");
+      setError("Missing payment reference. Please open My Forms or contact support.");
       return;
     }
 
     let cancelled = false;
 
-    async function load() {
-      try {
-        const res = await fetch(
-          `/api/payments/forms/verify?reference=${encodeURIComponent(reference)}`,
-        );
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || "Could not verify payment.");
-        }
-        if (cancelled) return;
+    async function complete() {
+      const endpoints = [
+        `/api/payments/forms/verify?reference=${encodeURIComponent(reference)}`,
+        `/api/apply/voucher/verify?reference=${encodeURIComponent(reference)}`,
+      ];
 
-        if (typeof data.email === "string" && data.email.trim()) {
-          try {
-            window.localStorage.setItem(
-              "tg_user_email",
-              data.email.trim().toLowerCase(),
-            );
-          } catch {
-            // ignore
+      let verifiedEmail: string | null = null;
+      let lastError: string | null = null;
+
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url);
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            lastError =
+              typeof data.error === "string"
+                ? data.error
+                : "Could not verify payment.";
+            continue;
           }
+          verifiedEmail =
+            typeof data.email === "string"
+              ? data.email.trim().toLowerCase()
+              : null;
+          break;
+        } catch {
+          lastError = "Could not verify payment. Please try again.";
+        }
+      }
+
+      if (cancelled) return;
+
+      if (verifiedEmail) {
+        try {
+          window.localStorage.setItem("tg_user_email", verifiedEmail);
+        } catch {
+          // ignore
         }
         window.dispatchEvent(new CustomEvent("tg-purchases-updated"));
         window.location.replace(
           `/dashboard/my-forms?reference=${encodeURIComponent(reference)}`,
         );
-      } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Could not verify payment. Please contact support.",
-          );
-        }
+        return;
       }
+
+      setError(
+        lastError ||
+          "Payment could not be verified. If you were charged, check your email or contact support.",
+      );
     }
 
-    void load();
+    void complete();
     return () => {
       cancelled = true;
     };
@@ -88,7 +103,10 @@ function UniversityFormSuccessContent() {
             <>
               <Loader2 className="h-10 w-10 animate-spin text-[#007AFF]" />
               <p className="text-sm font-medium text-[#555555]">
-                Confirming your payment…
+                Confirming your payment and preparing your voucher…
+              </p>
+              <p className="max-w-sm text-xs text-[#6B7280]">
+                Serial and PIN will be emailed to you and shown on My Forms.
               </p>
             </>
           )}
@@ -99,7 +117,7 @@ function UniversityFormSuccessContent() {
   );
 }
 
-export default function UniversityFormSuccessPage() {
+export default function PaymentReturnPage() {
   return (
     <Suspense
       fallback={
@@ -108,7 +126,7 @@ export default function UniversityFormSuccessPage() {
         </div>
       }
     >
-      <UniversityFormSuccessContent />
+      <PaymentReturnContent />
     </Suspense>
   );
 }

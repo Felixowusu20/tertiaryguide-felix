@@ -6,6 +6,16 @@ import {
   normalizeBrandColors,
 } from "@/lib/brand-theme";
 import {
+  DECLARATION_CERTIFY,
+  DECLARATION_FALSEHOOD,
+  DECLARATION_HEADING,
+  DECLARATION_IMPORTANT_BODY,
+  DECLARATION_IMPORTANT_HEADING,
+  DECLARATION_NAME_CLOSING,
+  DECLARATION_NAME_HINT,
+  declarationPermissionText,
+} from "@/lib/admissions/declaration";
+import {
   academicYearLabel,
   type ApplicationPrintoutData,
   type ApplicationPrintoutSchool,
@@ -58,6 +68,46 @@ function SectionTitle({
     >
       {children}
     </span>
+  );
+}
+
+function DeclarationSection({
+  schoolName,
+  declarationName,
+}: {
+  schoolName: string;
+  declarationName: string;
+}) {
+  const name = declarationName.trim() || "THE APPLICANT";
+  return (
+    <section className="relative z-10 mt-5 border border-[#D1D5DB] bg-white p-4 sm:p-5">
+      <p className="text-[12px] font-extrabold uppercase tracking-wide text-[#DC2626]">
+        {DECLARATION_IMPORTANT_HEADING}
+      </p>
+      <p className="mt-1 text-[11px] font-semibold uppercase leading-relaxed text-[#DC2626]">
+        {DECLARATION_IMPORTANT_BODY}
+      </p>
+      <hr className="my-3 border-[#D1D5DB]" />
+      <p className="text-[12px] font-extrabold uppercase tracking-wide">
+        {DECLARATION_HEADING}
+      </p>
+      <p className="mt-2 text-[12px] font-bold leading-relaxed">
+        {DECLARATION_CERTIFY}
+      </p>
+      <p className="mt-2 text-[12px] font-bold leading-relaxed">
+        {declarationPermissionText(schoolName)}
+      </p>
+      <p className="mt-2 text-[12px] font-bold leading-relaxed">
+        {DECLARATION_FALSEHOOD}
+      </p>
+      <p className="mt-2 text-[12px] font-bold leading-relaxed">
+        I, {name}{" "}
+        <span className="font-bold italic text-[#2563EB] underline">
+          {DECLARATION_NAME_HINT}
+        </span>{" "}
+        {DECLARATION_NAME_CLOSING}
+      </p>
+    </section>
   );
 }
 
@@ -289,6 +339,11 @@ export function ApplicationPrintout({
           </div>
         ))}
       </section>
+
+      <DeclarationSection
+        schoolName={school.name}
+        declarationName={data.declarationName}
+      />
     </article>
   );
 }
@@ -434,6 +489,13 @@ function buildPrintoutHtml(opts: {
     th, td { border: 1px solid #d1d5db; padding: 6px 8px; }
     td.prog { font-weight: 800; text-transform: uppercase; }
     .muted { font-size: 12px; font-style: italic; color: #64748b; }
+    .declaration { border: 1px solid #d1d5db; padding: 14px 16px; margin-top: 16px; position: relative; background: #fff; }
+    .declaration .important-h { color: #dc2626; font-weight: 800; font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .04em; }
+    .declaration .important-p { color: #dc2626; font-weight: 700; font-size: 11px; text-transform: uppercase; line-height: 1.45; margin: 6px 0 0; }
+    .declaration hr { border: none; border-top: 1px solid #d1d5db; margin: 12px 0; }
+    .declaration h2 { font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: .04em; }
+    .declaration p.body { font-size: 12px; font-weight: 700; line-height: 1.45; margin: 8px 0 0; }
+    .declaration .name-hint { color: #2563eb; font-style: italic; font-weight: 700; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -503,6 +565,16 @@ function buildPrintoutHtml(opts: {
             }`,
         )
         .join("")}
+    </section>
+    <section class="declaration">
+      <p class="important-h">${escapeHtml(DECLARATION_IMPORTANT_HEADING)}</p>
+      <p class="important-p">${escapeHtml(DECLARATION_IMPORTANT_BODY)}</p>
+      <hr />
+      <h2>${escapeHtml(DECLARATION_HEADING)}</h2>
+      <p class="body">${escapeHtml(DECLARATION_CERTIFY)}</p>
+      <p class="body">${escapeHtml(declarationPermissionText(school.name))}</p>
+      <p class="body">${escapeHtml(DECLARATION_FALSEHOOD)}</p>
+      <p class="body">I, ${escapeHtml(data.declarationName.trim() || "THE APPLICANT")} <span class="name-hint">${escapeHtml(DECLARATION_NAME_HINT)}</span> ${escapeHtml(DECLARATION_NAME_CLOSING)}</p>
     </section>
   </div>
 </body>
