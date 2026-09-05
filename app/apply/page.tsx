@@ -33,7 +33,6 @@ import {
   readApplySession,
   writeApplySession,
 } from "@/lib/admissions/applicant-session";
-import { controlClass } from "./components/FormControls";
 import { MultiStepApplicationForm } from "./components/MultiStepApplicationForm";
 import {
   PROGRAMME_LEVEL_LABELS,
@@ -235,18 +234,11 @@ function ApplyContent() {
           setEmailError(
             data.emailSent ? null : data.emailError || "Could not send email",
           );
-          if (typeof data.email === "string" && data.email.trim()) {
-            try {
-              window.localStorage.setItem(
-                "tg_user_email",
-                data.email.trim().toLowerCase(),
-              );
-            } catch {
-              // ignore
-            }
+          setStep("voucher-success");
+          if (data.school?.slug) {
+            const found = schools.find((s) => s.slug === data.school.slug);
+            if (found) setSchool(found);
           }
-          router.replace("/dashboard/my-forms");
-          return;
         } catch (e) {
           setError(e instanceof Error ? e.message : "Verification failed");
           setStep("voucher");
@@ -287,7 +279,6 @@ function ApplyContent() {
           email: accountEmail,
           schoolId: school.id,
           programmeLevel,
-          returnOrigin: window.location.origin,
         }),
       });
       const data = await res.json();
@@ -594,7 +585,7 @@ function ApplyContent() {
                   required
                   value={buyerName}
                   onChange={(e) => setBuyerName(e.target.value)}
-                  className={controlClass}
+                  className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 outline-none focus:border-[var(--school-brand,#007AFF)]"
                 />
               </label>
               <label className="space-y-1 text-sm sm:col-span-2">
@@ -604,7 +595,7 @@ function ApplyContent() {
                   type="email"
                   value={buyerEmail}
                   readOnly
-                  className={`${controlClass} bg-[#F8FAFC] text-[#64748B]`}
+                  className="w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2 text-[#4B5563] outline-none"
                 />
                 <span className="text-xs text-[#6B7280]">
                   Voucher will be linked to your TertiaryGuide account.
@@ -618,7 +609,7 @@ function ApplyContent() {
                   onChange={(e) =>
                     setProgrammeLevel(e.target.value as ProgrammeLevel | "")
                   }
-                  className={controlClass}
+                  className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 outline-none focus:border-[var(--school-brand,#007AFF)]"
                 >
                   <option value="">Select Undergraduate or Postgraduate</option>
                   <option value="undergraduate">Undergraduate</option>
@@ -700,22 +691,14 @@ function ApplyContent() {
         )}
 
         {step === "login" && school && (
-          <section className="overflow-hidden rounded-[28px] border border-[#E8EEF5] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-            <div className="border-b border-[#EEF2F7] bg-gradient-to-br from-[var(--school-brand-soft,#EFF6FF)] via-white to-white px-5 py-5 sm:px-6">
-            <h2 className="text-lg font-semibold tracking-tight text-[#0F172A]">
+          <section className="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold">
               {school.requiresVoucher ? "Login with voucher" : "Continue application"}
             </h2>
-            <p className="mt-1 text-sm text-[#64748B]">
-              {school.requiresVoucher
-                ? "Use the serial number and PIN from your payment email or My Forms."
-                : "Sign in with your details to continue your application."}
-            </p>
-            </div>
-            <div className="px-5 py-6 sm:px-6">
             {school.requiresVoucher ? (
-              <form onSubmit={validateVoucherLogin} className="grid gap-4">
-                <label className="space-y-1.5 text-sm">
-                  <span className="font-medium text-[#334155]">Serial number</span>
+              <form onSubmit={validateVoucherLogin} className="mt-6 grid gap-4">
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium">Serial number</span>
                   <input
                     required
                     value={serialNumber}
@@ -760,7 +743,7 @@ function ApplyContent() {
                     type="email"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    className={controlClass}
+                    className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 outline-none focus:border-[var(--school-brand,#007AFF)]"
                   />
                 </label>
                 <label className="space-y-1 text-sm">
@@ -769,7 +752,7 @@ function ApplyContent() {
                     type="password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    className={controlClass}
+                    className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 outline-none focus:border-[var(--school-brand,#007AFF)]"
                   />
                 </label>
                 <button
@@ -780,7 +763,6 @@ function ApplyContent() {
                 </button>
               </form>
             )}
-            </div>
           </section>
         )}
 
