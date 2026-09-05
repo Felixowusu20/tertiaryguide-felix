@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
-  ClipboardList,
   GraduationCap,
   Loader2,
   LogOut,
@@ -256,23 +255,18 @@ function ApplicantPortalContent() {
     >
       <Header />
       <main className="mx-auto max-w-5xl px-4 pt-4 pb-10 sm:px-6 md:pt-5">
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--school-brand,#007AFF)] text-white shadow-lg shadow-[var(--school-brand,#007AFF)]/20">
-              <ClipboardList className="h-6 w-6" />
-            </span>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94A3B8]">
-                Student portal
-              </p>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                My application
-              </h1>
-              <p className="mt-1 text-sm text-[#6B7280]">
-                Check status, review your chosen programmes, and edit while the
-                school is still reviewing.
-              </p>
-            </div>
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94A3B8]">
+              Student portal
+            </p>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              My application
+            </h1>
+            <p className="mt-1 text-sm text-[#6B7280]">
+              Check status, review your chosen programmes, and edit while the
+              school is still reviewing.
+            </p>
           </div>
           {session && (
             <button

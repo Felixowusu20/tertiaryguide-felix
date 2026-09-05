@@ -55,16 +55,18 @@ export default function MyFormsDashboardPage() {
       const res = await fetch(`/api/user/purchases?email=${encodeURIComponent(email)}`);
       const data = await res.json();
 
-      if (res.ok) {
-        const filtered = (data.purchases || []).filter(
-          (p: Purchase) =>
-            p.type === "university_form" || p.type === "partner_voucher",
-        );
-        setPurchases(filtered);
-        setError(null);
-      } else {
+      if (!res.ok) {
         setError(data.error || "Failed to fetch purchases.");
+        return [] as Purchase[];
       }
+
+      const filtered = (data.purchases || []).filter(
+        (p: Purchase) =>
+          p.type === "university_form" || p.type === "partner_voucher",
+      );
+      setPurchases(filtered);
+      setError(null);
+      return filtered;
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
