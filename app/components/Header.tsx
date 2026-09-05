@@ -1000,8 +1000,10 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
             !pathname.includes(lastVoucher.reference) && (
             <Link
               href={
-                lastVoucher?.reference
-                  ? "/dashboard/my-forms"
+                lastVoucher.schoolId && lastVoucher.reference
+                  ? `/university-forms/${lastVoucher.schoolId}/success?reference=${encodeURIComponent(
+                    lastVoucher.reference,
+                  )}&fromHeader=1`
                   : "/university-forms"
               }
               onClick={dismissVoucherPill}
@@ -1073,8 +1075,10 @@ export function Header({ hideAuth, showUserControls }: { hideAuth?: boolean; sho
             !pathname.includes(lastVoucher.reference) && (
             <Link
               href={
-                lastVoucher?.reference
-                  ? "/dashboard/my-forms"
+                lastVoucher.schoolId && lastVoucher.reference
+                  ? `/university-forms/${lastVoucher.schoolId}/success?reference=${encodeURIComponent(
+                    lastVoucher.reference,
+                  )}&fromHeader=1`
                   : "/university-forms"
               }
               onClick={dismissVoucherPill}

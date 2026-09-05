@@ -68,7 +68,6 @@ export async function GET(req: NextRequest) {
       alreadyFulfilled: result.alreadyFulfilled,
       emailSent: result.emailSent,
       emailError: result.emailError ?? null,
-      email,
       voucher: result.voucher,
       school: result.school,
     });
