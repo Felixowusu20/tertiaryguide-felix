@@ -8,6 +8,7 @@ import {
   Eye,
   Heart,
   Loader2,
+  Maximize2,
   MessageCircle,
   Play,
   SendHorizontal,
@@ -287,6 +288,23 @@ export function ExploreFeed({
   );
   const viewedIds = useRef<Set<string>>(new Set());
   const observerRef = useRef<IntersectionObserver | null>(null);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!openCommentsId) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(() => {
+      commentInputRef.current?.focus({ preventScroll: false });
+    }, 180);
+    return () => {
+      document.body.style.overflow = prev;
+      window.clearTimeout(focusTimer);
+    };
+  }, [openCommentsId]);
 
   const loadFeed = useCallback(async (cursor?: string | null) => {
     const email = getStoredUserEmail();
@@ -803,27 +821,37 @@ export function ExploreFeed({
         </div>
       </section>
 
-      {openCommentsId && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
-          <button
-            type="button"
-            className="absolute inset-0"
-            aria-label="Close comments"
-            onClick={() => setOpenCommentsId(null)}
-          />
-          <div className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white text-[#1E1E1E] shadow-2xl sm:max-h-[80vh] sm:rounded-3xl">
-            <div className="flex items-center justify-between border-b border-[#EFEFEF] px-4 py-3">
-              <h3 className="text-base font-semibold text-[#111827]">
-                Comments
-              </h3>
-              <button
-                type="button"
-                onClick={() => setOpenCommentsId(null)}
-                className="rounded-full bg-gray-100 p-2 text-[#4B5563] hover:bg-gray-200 hover:text-[#111827]"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      {portalReady &&
+        openCommentsId &&
+        createPortal(
+          <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/45 sm:items-center sm:p-4">
+            <button
+              type="button"
+              className="absolute inset-0"
+              aria-label="Close comments"
+              onClick={() => setOpenCommentsId(null)}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Comments"
+              className="relative flex max-h-[min(88dvh,640px)] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white text-[#1E1E1E] shadow-2xl sm:max-h-[80vh] sm:rounded-3xl"
+              style={{
+                paddingBottom: "max(0px, env(safe-area-inset-bottom))",
+              }}
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-[#EFEFEF] px-4 py-3">
+                <h3 className="text-base font-semibold text-[#111827]">
+                  Comments
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setOpenCommentsId(null)}
+                  className="rounded-full bg-gray-100 p-2 text-[#4B5563] hover:bg-gray-200 hover:text-[#111827]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
               {commentsLoading ? (
@@ -855,34 +883,78 @@ export function ExploreFeed({
                       </p>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-
-            <form
-              onSubmit={(e) => void submitComment(e)}
-              className="flex items-center gap-2 border-t border-[#EFEFEF] bg-white px-3 py-3"
-            >
-              <input
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Add a comment…"
-                className="min-w-0 flex-1 rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-sm text-[#111827] outline-none placeholder:text-[#9CA3AF] focus:border-[#007AFF] focus:bg-white"
-              />
-              <button
-                type="submit"
-                disabled={commentBusy || !commentText.trim()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#007AFF] text-white disabled:opacity-40"
-              >
-                {commentBusy ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : comments.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-[#4B5563]">
+                    No comments yet. Start the conversation.
+                  </p>
                 ) : (
-                  <SendHorizontal className="h-4 w-4" />
+                  comments.map((c) => (
+                    <div key={c.id} className="flex gap-2.5">
+                      <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gray-100">
+                        <OptimizedImage
+                          src={c.userAvatar || "/hero/avatar.png"}
+                          alt=""
+                          fill
+                          sizes="32px"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1 rounded-2xl bg-[#F3F4F6] px-3 py-2">
+                        <p className="text-xs font-semibold text-[#111827]">
+                          {c.userName}
+                        </p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-sm leading-snug text-[#111827]">
+                          {c.text}
+                        </p>
+                      </div>
+                    </div>
+                  ))
                 )}
-              </button>
-            </form>
-          </div>
-        </div>
+              </div>
+
+              <form
+                onSubmit={(e) => void submitComment(e)}
+                className="flex shrink-0 items-center gap-2 border-t border-[#EFEFEF] bg-white px-3 py-3"
+              >
+                <input
+                  ref={commentInputRef}
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Add a comment…"
+                  enterKeyHint="send"
+                  className="min-w-0 flex-1 rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 text-base text-[#111827] outline-none placeholder:text-[#9CA3AF] focus:border-[#007AFF] focus:bg-white sm:text-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={commentBusy || !commentText.trim()}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#007AFF] text-white disabled:opacity-40"
+                >
+                  {commentBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <SendHorizontal className="h-4 w-4" />
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {lightbox?.type === "image" && (
+        <FlyerLightbox
+          src={lightbox.url}
+          alt={lightbox.alt}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+
+      {lightbox?.type === "video" && (
+        <ExploreVideoLightbox
+          src={lightbox.url}
+          alt={lightbox.alt}
+          onClose={() => setLightbox(null)}
+        />
       )}
 
       {lightbox && (
