@@ -49,7 +49,7 @@ export default function MyFormsDashboardPage() {
       if (!email) {
         setError("User email not found. Please log in.");
         setLoading(false);
-        return [] as Purchase[];
+        return;
       }
 
       const res = await fetch(`/api/user/purchases?email=${encodeURIComponent(email)}`);
@@ -69,7 +69,6 @@ export default function MyFormsDashboardPage() {
       return filtered;
     } catch {
       setError("Something went wrong. Please try again.");
-      return [] as Purchase[];
     } finally {
       setLoading(false);
     }
@@ -77,85 +76,22 @@ export default function MyFormsDashboardPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let cancelled = false;
-
-    async function boot() {
-      const params = new URLSearchParams(window.location.search);
-      const reference = params.get("reference")?.trim();
-      const from = params.get("from");
-
-      if (reference) {
-        setLoading(true);
-        const partnerUrl = `/api/apply/voucher/verify?reference=${encodeURIComponent(reference)}`;
-        const formUrl = `/api/payments/forms/verify?reference=${encodeURIComponent(reference)}`;
-        const endpoints =
-          from === "partner"
-            ? [partnerUrl, formUrl]
-            : from === "form"
-              ? [formUrl, partnerUrl]
-              : [formUrl, partnerUrl];
-
-        let verifiedEmail: string | null = null;
-        let highlightSerial: string | null = null;
-
-        for (const url of endpoints) {
-          try {
-            const res = await fetch(url);
-            const data = await res.json();
-            if (!res.ok) continue;
-            verifiedEmail =
-              typeof data.email === "string" ? data.email.trim().toLowerCase() : null;
-            highlightSerial =
-              data.voucher?.serial ||
-              data.voucher?.serialNumber ||
-              null;
-            break;
-          } catch {
-            // try the next verify endpoint
-          }
-        }
-
-        if (verifiedEmail) {
-          window.localStorage.setItem("tg_user_email", verifiedEmail);
-        }
-
-        window.history.replaceState({}, "", "/dashboard/my-forms");
-        window.dispatchEvent(new CustomEvent("tg-purchases-updated"));
-
-        const list = cancelled ? [] : await fetchPurchases();
-        if (!cancelled && highlightSerial) {
-          const match = list.find(
-            (p) => p.voucher?.serial === highlightSerial,
-          );
-          if (match) {
-            setFlippedIds(new Set([match.id]));
-          }
-        }
-        return;
-      }
-
-      const email = window.localStorage.getItem("tg_user_email");
-      if (!email) {
-        router.replace(
-          `/signin?redirect=${encodeURIComponent("/dashboard/my-forms")}`,
-        );
-        return;
-      }
-
-      void fetchPurchases();
+    const email = window.localStorage.getItem("tg_user_email");
+    if (!email) {
+      router.replace(
+        `/signin?redirect=${encodeURIComponent("/dashboard/my-forms")}`,
+      );
+      return;
     }
 
-    void boot();
+    void fetchPurchases();
 
     const handleUpdate = () => {
       void fetchPurchases();
     };
 
     window.addEventListener("tg-purchases-updated", handleUpdate);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("tg-purchases-updated", handleUpdate);
-    };
+    return () => window.removeEventListener("tg-purchases-updated", handleUpdate);
   }, [router]);
 
   const copyToClipboard = (
