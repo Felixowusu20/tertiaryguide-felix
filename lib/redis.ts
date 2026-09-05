@@ -27,6 +27,17 @@ let redisCacheEnabled =
 
 let redisUnreachable = false;
 
+function isRedisAuthError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return (
+    msg.includes("wrongpass") ||
+    msg.includes("invalid or missing auth token") ||
+    msg.includes("unauthorized") ||
+    msg.includes("http_unauthorized")
+  );
+}
+
 function isRedisNetworkError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const cause = error.cause as { code?: string } | undefined;
@@ -38,7 +49,16 @@ function isRedisNetworkError(error: unknown): boolean {
 }
 
 function markRedisUnreachable(error: unknown) {
-  if (!redisUnreachable && isRedisNetworkError(error)) {
+  if (redisUnreachable) return;
+  if (isRedisAuthError(error)) {
+    redisUnreachable = true;
+    redisCacheEnabled = false;
+    console.warn(
+      "[redis] Upstash auth failed (check UPSTASH_REDIS_REST_TOKEN); cache disabled until the server restarts.",
+    );
+    return;
+  }
+  if (isRedisNetworkError(error)) {
     redisUnreachable = true;
     redisCacheEnabled = false;
     console.warn(

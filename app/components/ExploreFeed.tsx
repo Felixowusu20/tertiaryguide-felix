@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   BadgeCheck,
@@ -19,6 +20,7 @@ import {
 import { postTypeLabel, type ExplorePostType } from "@/lib/explore/types";
 import { OptimizedImage } from "@/app/components/OptimizedImage";
 import { ResponsiveMediaImg } from "@/app/components/ResponsiveMediaImg";
+import { FlyerLightbox } from "@/app/components/FlyerLightbox";
 import {
   IMAGE_SIZES,
   SRCSET_WIDTHS,
@@ -35,6 +37,10 @@ import {
   signInRedirectHref,
 } from "@/lib/client-auth";
 import { trackAdAnalytics } from "@/lib/ad-analytics-client";
+
+type MediaLightbox =
+  | { type: "image"; url: string; alt: string }
+  | { type: "video"; url: string; alt: string };
 
 type ExploreMedia = { type: "image" | "video"; url: string };
 
@@ -105,9 +111,13 @@ function mediaFrameClass(compact: boolean, shape: MediaShape) {
 function ExploreVideo({
   src,
   compact = false,
+  onOpen,
+  pauseAutoplay = false,
 }: {
   src: string;
   compact?: boolean;
+  onOpen?: () => void;
+  pauseAutoplay?: boolean;
 }) {
   const [shape, setShape] = useState<MediaShape>("portrait");
   const [muted, setMuted] = useState(true);
@@ -128,7 +138,7 @@ function ExploreVideo({
     if (!video) return;
 
     const tryPlay = () => {
-      if (userPausedRef.current) return;
+      if (userPausedRef.current || pauseAutoplay) return;
       video.muted = mutedRef.current;
       void playInViewVideo(video).catch(() => {
         video.muted = true;
@@ -138,7 +148,7 @@ function ExploreVideo({
       });
     };
 
-    if (inView && !userPaused) {
+    if (inView && !userPaused && !pauseAutoplay) {
       tryPlay();
       video.addEventListener("canplay", tryPlay);
       video.addEventListener("loadeddata", tryPlay);
@@ -150,7 +160,7 @@ function ExploreVideo({
 
     pauseInViewVideo(video);
     if (!inView) setUserPaused(false);
-  }, [inView, userPaused, src]);
+  }, [inView, userPaused, src, pauseAutoplay]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -165,7 +175,13 @@ function ExploreVideo({
     mutedRef.current = next;
     if (!video) return;
     video.muted = next;
-    if (!next && video.paused && !userPausedRef.current && inView) {
+    if (
+      !next &&
+      video.paused &&
+      !userPausedRef.current &&
+      inView &&
+      !pauseAutoplay
+    ) {
       void playInViewVideo(video).catch(() => {
         video.muted = true;
         mutedRef.current = true;
@@ -215,6 +231,19 @@ function ExploreVideo({
           </span>
         </div>
       )}
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+          className="absolute bottom-2.5 left-2.5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/70"
+          aria-label="Open video fullscreen"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={toggleMute}
@@ -266,6 +295,103 @@ function ExploreImage({
   );
 }
 
+function ExploreVideoLightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = muted;
+    void video.play().catch(() => {
+      video.muted = true;
+      setMuted(true);
+      void video.play().catch(() => undefined);
+    });
+  }, [src, muted, mounted]);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={alt}
+      className="fixed inset-0 z-[200] flex flex-col bg-black"
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-4">
+        <p className="min-w-0 truncate text-sm font-medium text-white/90">
+          {alt}
+        </p>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setMuted((m) => !m)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20"
+            aria-label={muted ? "Unmute" : "Mute"}
+          >
+            {muted ? (
+              <VolumeX className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/25"
+            aria-label="Close video"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+      <div className="relative flex min-h-0 flex-1 items-center justify-center px-0 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4">
+        <video
+          ref={videoRef}
+          src={src}
+          controls
+          playsInline
+          autoPlay
+          loop
+          className="max-h-full max-w-full object-contain"
+        />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function ExploreFeed({
   embedded = false,
   variant = "tab",
@@ -283,9 +409,9 @@ export function ExploreFeed({
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [commentBusy, setCommentBusy] = useState(false);
-  const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(
-    null,
-  );
+  const [lightbox, setLightbox] = useState<MediaLightbox | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+  const commentInputRef = useRef<HTMLInputElement | null>(null);
   const viewedIds = useRef<Set<string>>(new Set());
   const observerRef = useRef<IntersectionObserver | null>(null);
 
@@ -674,40 +800,42 @@ export function ExploreFeed({
                             : "grid grid-cols-2 gap-px bg-[#E8EEF5]"
                         }`}
                       >
-                        {post.media.slice(0, 4).map((m, i) =>
-                          m.type === "video" ? (
+                        {post.media.slice(0, 4).map((m, i) => {
+                          const alt = imageAlt(
+                            post.body,
+                            `${post.authorName} ${postTypeLabel(post.postType)}`,
+                          );
+                          const openMedia = () => {
+                            trackAdAnalytics({
+                              kind: "explore",
+                              assetId: post.id,
+                              type: "click",
+                              placement: "explore",
+                            });
+                            setLightbox({
+                              type: m.type,
+                              url: m.url,
+                              alt,
+                            });
+                          };
+                          return m.type === "video" ? (
                             <ExploreVideo
                               key={`${post.id}-media-${i}`}
                               src={m.url}
                               compact={post.media.length > 1}
+                              onOpen={openMedia}
+                              pauseAutoplay={lightbox?.type === "video"}
                             />
                           ) : (
                             <ExploreImage
                               key={`${post.id}-media-${i}`}
                               src={m.url}
-                              alt={imageAlt(
-                                post.body,
-                                `${post.authorName} ${postTypeLabel(post.postType)}`,
-                              )}
+                              alt={alt}
                               compact={post.media.length > 1}
-                              onOpen={() => {
-                                trackAdAnalytics({
-                                  kind: "explore",
-                                  assetId: post.id,
-                                  type: "click",
-                                  placement: "explore",
-                                });
-                                setLightbox({
-                                  url: m.url,
-                                  alt: imageAlt(
-                                    post.body,
-                                    `${post.authorName} ${postTypeLabel(post.postType)}`,
-                                  ),
-                                });
-                              }}
+                              onOpen={openMedia}
                             />
-                          ),
-                        )}
+                          );
+                        })}
                       </div>
                     )}
 
@@ -853,7 +981,7 @@ export function ExploreFeed({
                 </button>
               </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3">
               {commentsLoading ? (
                 <div className="flex justify-center py-10">
                   <Loader2 className="h-5 w-5 animate-spin text-[#007AFF]" />
@@ -883,34 +1011,9 @@ export function ExploreFeed({
                       </p>
                     </div>
                   </div>
-                ) : comments.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-[#4B5563]">
-                    No comments yet. Start the conversation.
-                  </p>
-                ) : (
-                  comments.map((c) => (
-                    <div key={c.id} className="flex gap-2.5">
-                      <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gray-100">
-                        <OptimizedImage
-                          src={c.userAvatar || "/hero/avatar.png"}
-                          alt=""
-                          fill
-                          sizes="32px"
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1 rounded-2xl bg-[#F3F4F6] px-3 py-2">
-                        <p className="text-xs font-semibold text-[#111827]">
-                          {c.userName}
-                        </p>
-                        <p className="mt-0.5 whitespace-pre-wrap text-sm leading-snug text-[#111827]">
-                          {c.text}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                ))
+              )}
+            </div>
 
               <form
                 onSubmit={(e) => void submitComment(e)}
@@ -955,35 +1058,6 @@ export function ExploreFeed({
           alt={lightbox.alt}
           onClose={() => setLightbox(null)}
         />
-      )}
-
-      {lightbox && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4">
-          <button
-            type="button"
-            className="absolute inset-0 cursor-zoom-out"
-            aria-label="Close image"
-            onClick={() => setLightbox(null)}
-          />
-          <button
-            type="button"
-            onClick={() => setLightbox(null)}
-            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-[#111827]"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <ResponsiveMediaImg
-            src={lightbox.url}
-            alt={lightbox.alt}
-            sizes={IMAGE_SIZES.lightbox}
-            widths={SRCSET_WIDTHS.lightbox}
-            widthHint={1600}
-            loading="eager"
-            fetchPriority="high"
-            className="relative z-10 max-h-[90vh] max-w-full object-contain"
-          />
-        </div>
       )}
     </>
   );

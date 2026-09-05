@@ -1438,7 +1438,6 @@ export function MultiStepApplicationForm({
               </button>
             ) : null}
           </div>
-          </FormSection>
         )}
 
         {tab === "examination" && (
@@ -1639,7 +1638,6 @@ export function MultiStepApplicationForm({
               </div>
             ))}
           </div>
-          </FormSection>
         )}
 
         {tab === "documents" && (
