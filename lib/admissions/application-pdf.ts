@@ -1,16 +1,6 @@
 import { jsPDF } from "jspdf";
 import { DEFAULT_BRAND_COLOR, normalizeBrandColor } from "@/lib/brand-theme";
 import {
-  DECLARATION_CERTIFY,
-  DECLARATION_FALSEHOOD,
-  DECLARATION_HEADING,
-  DECLARATION_IMPORTANT_BODY,
-  DECLARATION_IMPORTANT_HEADING,
-  DECLARATION_NAME_CLOSING,
-  DECLARATION_NAME_HINT,
-  declarationPermissionText,
-} from "@/lib/admissions/declaration";
-import {
   academicYearLabel,
   type ApplicationPrintoutData,
   type ApplicationPrintoutSchool,
@@ -262,109 +252,6 @@ export async function buildApplicationSummaryPdf(opts: {
     }
     y += 4;
   }
-
-  const declarationName = (data.declarationName || "").trim() || "THE APPLICANT";
-  const permission = declarationPermissionText(school.name);
-  const nameRuns: Array<{
-    text: string;
-    italic?: boolean;
-    color?: [number, number, number];
-    underline?: boolean;
-  }> = [
-    { text: `I, ${declarationName} ` },
-    {
-      text: `${DECLARATION_NAME_HINT} `,
-      italic: true,
-      color: [37, 99, 235],
-      underline: true,
-    },
-    { text: DECLARATION_NAME_CLOSING },
-  ];
-
-  const wrapPlain = (text: string, width: number) =>
-    pdf.splitTextToSize(text, width) as string[];
-
-  const declarationInner = 4;
-  const boxWidth = right - left;
-  const textWidth = boxWidth - declarationInner * 2;
-  const bodyLines = [
-    ...wrapPlain(DECLARATION_CERTIFY, textWidth),
-    "",
-    ...wrapPlain(permission, textWidth),
-    "",
-    ...wrapPlain(DECLARATION_FALSEHOOD, textWidth),
-  ];
-  const importantLines = wrapPlain(DECLARATION_IMPORTANT_BODY, textWidth);
-  const lineH = 4.4;
-  const estimated =
-    8 +
-    importantLines.length * 4.2 +
-    10 +
-    bodyLines.length * lineH +
-    16;
-  if (y + estimated > pageHeight - 14) {
-    pdf.addPage();
-    y = 14;
-  }
-
-  const boxTop = y;
-  let ty = boxTop + 6;
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(9);
-  pdf.setTextColor(220, 38, 38);
-  pdf.text(DECLARATION_IMPORTANT_HEADING, left + declarationInner, ty);
-  ty += 5;
-  pdf.setFontSize(8);
-  for (const line of importantLines) {
-    pdf.text(line, left + declarationInner, ty);
-    ty += 4.2;
-  }
-  ty += 2;
-  pdf.setDrawColor(209, 213, 219);
-  pdf.line(left + declarationInner, ty, right - declarationInner, ty);
-  ty += 6;
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(9);
-  pdf.setTextColor(17, 24, 39);
-  pdf.text(DECLARATION_HEADING, left + declarationInner, ty);
-  ty += 6;
-  pdf.setFontSize(8);
-  for (const line of bodyLines) {
-    if (!line) {
-      ty += 2;
-      continue;
-    }
-    pdf.text(line, left + declarationInner, ty);
-    ty += lineH;
-  }
-  ty += 2;
-
-  let cx = left + declarationInner;
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(8);
-  for (const run of nameRuns) {
-    pdf.setFont("helvetica", run.italic ? "bolditalic" : "bold");
-    pdf.setTextColor(...(run.color || [17, 24, 39]));
-    const words = run.text.split(/(\s+)/).filter((word) => word.length > 0);
-    for (const word of words) {
-      const w = pdf.getTextWidth(word);
-      if (cx + w > right - declarationInner && cx > left + declarationInner) {
-        cx = left + declarationInner;
-        ty += lineH;
-      }
-      pdf.text(word, cx, ty);
-      if (run.underline && word.trim()) {
-        pdf.setDrawColor(...(run.color || [17, 24, 39]));
-        pdf.line(cx, ty + 0.7, cx + w, ty + 0.7);
-      }
-      cx += w;
-    }
-  }
-  ty += 6;
-  const actualHeight = Math.max(estimated, ty - boxTop + 2);
-  pdf.setDrawColor(209, 213, 219);
-  pdf.rect(left, boxTop, boxWidth, actualHeight, "S");
-  y = boxTop + actualHeight + 4;
 
   const array = pdf.output("arraybuffer");
   return Buffer.from(array);

@@ -1393,48 +1393,45 @@ export function MultiStepApplicationForm({
         )}
 
         {tab === "education" && (
-          <FormSection
-            title="Educational background"
-            description="Add every school you attended. You will attach exams and results to a specific school in the next steps."
-          >
-          <div className="space-y-4">
+          <div className="space-y-5">
+            <p className="text-sm text-[#64748B]">
+              Add every school you attended. You will attach exams and results
+              to a specific school in the next steps.
+            </p>
             {form.educations.map((education, index) => (
-              <FormCard
+              <div
                 key={`education-${index}`}
-                title={
-                  <>
+                className="rounded-2xl border border-[#E2E8F0] p-4"
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">
                     Institution {index + 1}
-                    {education.institutionName
-                      ? ` — ${education.institutionName}`
-                      : ""}
-                  </>
-                }
-                action={
-                  form.educations.length > 1 ? (
+                    {education.institutionName ? ` — ${education.institutionName}` : ""}
+                  </h3>
+                  {form.educations.length > 1 ? (
                     <button
                       type="button"
                       onClick={() => removeInstitution(index)}
-                      className="inline-flex items-center gap-1 rounded-full border border-[#FECACA] bg-white px-3 py-1 text-xs font-medium text-[#B91C1C] hover:bg-[#FEF2F2]"
+                      className="inline-flex items-center gap-1 rounded-full border border-[#FECACA] px-3 py-1 text-xs font-medium text-[#B91C1C] hover:bg-[#FEF2F2]"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Remove
                     </button>
-                  ) : null
-                }
-              >
+                  ) : null}
+                </div>
                 <InstitutionFields
                   education={education}
                   errorPrefix={String(index)}
                   errors={errors}
                   onChange={(key, value) => setEducationAt(index, key, value)}
                 />
-              </FormCard>
+              </div>
             ))}
             {form.educations.length < MAX_INSTITUTIONS ? (
               <button
                 type="button"
                 onClick={addInstitution}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--school-brand,#007AFF)] bg-[var(--school-brand-soft,#EFF6FF)]/40 px-4 py-3 text-sm font-semibold text-[var(--school-brand,#007AFF)] transition hover:bg-[var(--school-brand-soft,#EFF6FF)] sm:w-auto"
+                className="inline-flex items-center gap-2 rounded-full border border-dashed border-[var(--school-brand,#007AFF)] px-4 py-2.5 text-sm font-semibold text-[var(--school-brand,#007AFF)] hover:bg-[var(--school-brand-soft,#EFF6FF)]"
               >
                 <Plus className="h-4 w-4" />
                 Add another institution
@@ -1445,39 +1442,34 @@ export function MultiStepApplicationForm({
         )}
 
         {tab === "examination" && (
-          <FormSection
-            title="Examination sittings"
-            description="Link each exam sitting to the school where you wrote it — May/June, Nov/Dec (NOVDEC), or another exam type."
-          >
-          <div className="space-y-4">
+          <div className="space-y-5">
+            <p className="text-sm text-[#64748B]">
+              Link each exam sitting to the school where you wrote it. Use this
+              for May/June, Nov/Dec (NOVDEC), or any other exam type.
+            </p>
             {form.examSittings.map((sitting, index) => (
-              <FormCard
+              <div
                 key={`exam-${index}`}
-                title={
-                  <div>
-                    <p>
-                      {index === 0
-                        ? "Primary sitting"
-                        : `Additional sitting ${index}`}
-                    </p>
-                    <p className="mt-0.5 text-xs font-medium text-[#64748B]">
+                className="rounded-2xl border border-[#E2E8F0] p-4"
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">
+                    {index === 0 ? "Primary sitting" : `Additional sitting ${index}`}
+                    <span className="mt-0.5 block font-medium text-[#64748B]">
                       {examSittingLabel(sitting, form.educations, index)}
-                    </p>
-                  </div>
-                }
-                action={
-                  form.examSittings.length > 1 ? (
+                    </span>
+                  </h3>
+                  {form.examSittings.length > 1 ? (
                     <button
                       type="button"
                       onClick={() => removeExamSitting(index)}
-                      className="inline-flex items-center gap-1 rounded-full border border-[#FECACA] bg-white px-3 py-1 text-xs font-medium text-[#B91C1C] hover:bg-[#FEF2F2]"
+                      className="inline-flex items-center gap-1 rounded-full border border-[#FECACA] px-3 py-1 text-xs font-medium text-[#B91C1C] hover:bg-[#FEF2F2]"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Remove
                     </button>
-                  ) : null
-                }
-              >
+                  ) : null}
+                </div>
                 <div className="mb-4">
                   <Field
                     label="School / institution for this exam"
@@ -1511,58 +1503,57 @@ export function MultiStepApplicationForm({
                     setExamSittingInfo(index, key, value)
                   }
                 />
-              </FormCard>
+              </div>
             ))}
             {form.examSittings.length < MAX_EXAM_SITTINGS ? (
               <button
                 type="button"
                 onClick={addExamSitting}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--school-brand,#007AFF)] bg-[var(--school-brand-soft,#EFF6FF)]/40 px-4 py-3 text-sm font-semibold text-[var(--school-brand,#007AFF)] transition hover:bg-[var(--school-brand-soft,#EFF6FF)] sm:w-auto"
+                className="inline-flex items-center gap-2 rounded-full border border-dashed border-[var(--school-brand,#007AFF)] px-4 py-2.5 text-sm font-semibold text-[var(--school-brand,#007AFF)] hover:bg-[var(--school-brand-soft,#EFF6FF)]"
               >
                 <Plus className="h-4 w-4" />
                 Add another examination
               </button>
             ) : null}
             {errors.examSittings ? (
-              <p className="text-xs font-medium text-[#DC2626]">
-                {errors.examSittings}
-              </p>
+              <p className="text-xs text-red-600">{errors.examSittings}</p>
             ) : null}
           </div>
-          </FormSection>
         )}
 
         {tab === "results" && (
-          <FormSection
-            title="Examination results"
-            description="Enter results for each exam sitting. The first sitting needs all core grades. Extra sittings, such as Nov/Dec, can include only the subjects you wrote."
-          >
-          <div className="space-y-4">
+          <div className="space-y-5">
+            <p className="text-sm text-[#64748B]">
+              Enter results for each exam sitting. The first sitting needs all
+              core grades. Extra sittings, such as Nov/Dec, can include only the
+              subjects you wrote.
+            </p>
             {form.examSittings.map((sitting, sittingIndex) => (
-              <FormCard
+              <div
                 key={`results-${sittingIndex}`}
-                title={examSittingLabel(sitting, form.educations, sittingIndex)}
+                className="rounded-2xl border border-[#E2E8F0] p-4"
               >
+                <h3 className="mb-4 text-sm font-semibold text-[#0F172A]">
+                  {examSittingLabel(sitting, form.educations, sittingIndex)}
+                </h3>
                 {errors[`examSittings.${sittingIndex}`] ? (
-                  <p className="mb-3 text-xs font-medium text-[#DC2626]">
+                  <p className="mb-3 text-xs text-red-600">
                     {errors[`examSittings.${sittingIndex}`]}
                   </p>
                 ) : null}
                 <div className="space-y-6">
                   <div>
-                    <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#64748B]">
+                    <h4 className="mb-3 text-sm font-semibold text-[#334155]">
                       Core subjects
-                      {sittingIndex === 0 ? " · required" : " · if written"}
+                      {sittingIndex === 0 ? " (required)" : " (if written)"}
                     </h4>
                     <div className="space-y-2">
                       {CORE_SUBJECTS.map((subject, index) => (
                         <div
                           key={subject}
-                          className="grid grid-cols-[1fr_7.5rem] items-center gap-2 rounded-xl bg-white px-2.5 py-2 ring-1 ring-[#EEF2F7] sm:grid-cols-[1fr_8rem]"
+                          className="grid grid-cols-[1fr_8rem] items-center gap-2"
                         >
-                          <span className="text-sm font-medium text-[#334155]">
-                            {subject}
-                          </span>
+                          <span className="text-sm text-[#334155]">{subject}</span>
                           <TextSelect
                             value={sitting.coreResults[index]?.grade || ""}
                             onChange={(e) => {
@@ -1585,18 +1576,18 @@ export function MultiStepApplicationForm({
                       ))}
                     </div>
                     {errors[`examSittings.${sittingIndex}.coreResults`] ? (
-                      <p className="mt-2 text-xs font-medium text-[#DC2626]">
+                      <p className="mt-2 text-xs text-red-600">
                         {errors[`examSittings.${sittingIndex}.coreResults`]}
                       </p>
                     ) : null}
                   </div>
                   <div>
-                    <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#64748B]">
-                      Elective subjects · up to 8
+                    <h4 className="mb-3 text-sm font-semibold text-[#334155]">
+                      Elective subjects (up to 8)
                     </h4>
                     <div className="space-y-2">
                       {sitting.electiveResults.map((row, index) => (
-                        <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div key={index} className="grid grid-cols-2 gap-2">
                           <TextSelect
                             value={row.subject || ""}
                             onChange={(e) => {
@@ -1639,23 +1630,24 @@ export function MultiStepApplicationForm({
                       ))}
                     </div>
                     {errors[`examSittings.${sittingIndex}.electiveResults`] ? (
-                      <p className="mt-2 text-xs font-medium text-[#DC2626]">
+                      <p className="mt-2 text-xs text-red-600">
                         {errors[`examSittings.${sittingIndex}.electiveResults`]}
                       </p>
                     ) : null}
                   </div>
                 </div>
-              </FormCard>
+              </div>
             ))}
           </div>
           </FormSection>
         )}
 
         {tab === "documents" && (
-          <FormSection
-            title="Supporting documents"
-            description="A Ghana Card or other national ID is required. Birth certificate is optional."
-          >
+          <div className="space-y-4">
+            <p className="text-sm text-[#64748B]">
+              A Ghana Card or other national ID is required. Birth certificate
+              is optional.
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
             <FileDropzone
               label="Passport photograph"
@@ -1756,7 +1748,7 @@ export function MultiStepApplicationForm({
               }
             />
             </div>
-          </FormSection>
+          </div>
         )}
 
         {tab === "review" && (
@@ -1787,7 +1779,7 @@ export function MultiStepApplicationForm({
                     ),
                   }).finally(() => setDownloadingPdf(false));
                 }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-semibold text-[#334155] shadow-sm hover:bg-[#F8FAFC] disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] disabled:opacity-60"
               >
                 {downloadingPdf ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1797,7 +1789,6 @@ export function MultiStepApplicationForm({
                 {downloadingPdf ? "Preparing PDF…" : "Download summary PDF"}
               </button>
             </div>
-            <div className="overflow-hidden rounded-2xl border border-[#E8EEF5] bg-white">
             <ApplicationPrintout
               school={{
                 name: schoolName,
@@ -1813,8 +1804,7 @@ export function MultiStepApplicationForm({
                 existingApplicationNumber || undefined,
               )}
             />
-            </div>
-            <label className="flex items-start gap-3 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 transition hover:border-[var(--school-brand-border,#BFDBFE)]">
+            <label className="flex items-start gap-3 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
               <input
                 type="checkbox"
                 checked={form.declarationAccepted}

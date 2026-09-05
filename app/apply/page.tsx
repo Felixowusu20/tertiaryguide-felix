@@ -720,7 +720,7 @@ function ApplyContent() {
                     required
                     value={serialNumber}
                     onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
-                    className={`${controlClass} font-mono`}
+                    className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 font-mono text-[#111827] caret-[#111827] outline-none placeholder:text-[#9CA3AF] focus:border-[var(--school-brand,#007AFF)]"
                     placeholder="TG-2026-001234"
                   />
                 </label>
@@ -730,7 +730,7 @@ function ApplyContent() {
                     required
                     value={voucherCode}
                     onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                    className={`${controlClass} font-mono`}
+                    className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 font-mono text-[#111827] caret-[#111827] outline-none placeholder:text-[#9CA3AF] focus:border-[var(--school-brand,#007AFF)]"
                     placeholder="HS-8K7D-29PX"
                   />
                 </label>

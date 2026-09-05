@@ -62,7 +62,8 @@ export default function MyFormsDashboardPage() {
         );
         setPurchases(filtered);
         setError(null);
-        return filtered as Purchase[];
+      } else {
+        setError(data.error || "Failed to fetch purchases.");
       }
       setError(data.error || "Failed to fetch purchases.");
       return [] as Purchase[];
@@ -264,7 +265,7 @@ export default function MyFormsDashboardPage() {
   function statusLabel(purchase: Purchase) {
     if (purchase.status === "pending") return "Pending voucher";
     if (purchase.type === "partner_voucher") return "Ready to apply";
-    return "Voucher ready";
+    return "Active";
   }
 
   if (loading) {
@@ -405,8 +406,8 @@ export default function MyFormsDashboardPage() {
           </span>
           <h2 className="mb-2 text-xl font-bold text-[#1E1E1E]">No vouchers yet</h2>
           <p className="mb-8 max-w-sm text-sm text-[#555555]">
-            Buy a university form and the voucher will show up here. Secured
-            schools also let you apply online from this page.
+            Buy a university form or a direct-application voucher and it will
+            show up here.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -419,7 +420,7 @@ export default function MyFormsDashboardPage() {
               href="/apply"
               className="rounded-full border border-[#007AFF] px-8 py-3 text-sm font-medium text-[#007AFF] transition hover:bg-[#EFF6FF]"
             >
-              Secured schools
+              Apply online
             </Link>
           </div>
         </div>
@@ -494,7 +495,7 @@ export default function MyFormsDashboardPage() {
                             </span>
                           </div>
                           <p className="text-[10px] font-bold uppercase tracking-wider text-black/40">
-                            {isPartner ? "Secured school" : "University form"}
+                            {isPartner ? "Direct apply" : "University form"}
                           </p>
                           <h2 className="mt-1 text-xl font-bold leading-tight text-[#1E1E1E]">
                             {purchase.schoolName || "School form"}
@@ -621,7 +622,7 @@ export default function MyFormsDashboardPage() {
                               ) : (
                                 <ExternalLink className="h-3.5 w-3.5" />
                               )}
-                              Apply online
+                              Open application
                             </button>
                           ) : null}
 
