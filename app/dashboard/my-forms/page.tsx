@@ -43,13 +43,13 @@ export default function MyFormsDashboardPage() {
   const [showAssistance, setShowAssistance] = useState(false);
   const [assistanceSession, setAssistanceSession] = useState(0);
 
-  async function fetchPurchases() {
+  async function fetchPurchases(): Promise<Purchase[]> {
     try {
       const email = window.localStorage.getItem("tg_user_email");
       if (!email) {
         setError("User email not found. Please log in.");
         setLoading(false);
-        return [] as Purchase[];
+        return [];
       }
 
       const res = await fetch(`/api/user/purchases?email=${encodeURIComponent(email)}`);
@@ -57,11 +57,11 @@ export default function MyFormsDashboardPage() {
 
       if (!res.ok) {
         setError(data.error || "Failed to fetch purchases.");
-        return [] as Purchase[];
+        return [];
       }
 
-      const filtered = (data.purchases || []).filter(
-        (p: Purchase) =>
+      const filtered = ((data.purchases || []) as Purchase[]).filter(
+        (p) =>
           p.type === "university_form" || p.type === "partner_voucher",
       );
       setPurchases(filtered);
@@ -69,7 +69,7 @@ export default function MyFormsDashboardPage() {
       return filtered;
     } catch {
       setError("Something went wrong. Please try again.");
-      return [] as Purchase[];
+      return [];
     } finally {
       setLoading(false);
     }
@@ -122,7 +122,7 @@ export default function MyFormsDashboardPage() {
         window.history.replaceState({}, "", "/dashboard/my-forms");
         window.dispatchEvent(new CustomEvent("tg-purchases-updated"));
 
-        const list = cancelled ? [] : await fetchPurchases();
+        const list: Purchase[] = cancelled ? [] : await fetchPurchases();
         if (!cancelled && highlightSerial) {
           const match = list.find(
             (p) => p.voucher?.serial === highlightSerial,
