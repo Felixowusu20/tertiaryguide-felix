@@ -129,6 +129,8 @@ export type CachedSchool = {
   logoSrc: string | null;
   logoAlt: string | null;
   priceGhs: number | null;
+  undergraduateVoucherPrice?: number | null;
+  postgraduateVoucherPrice?: number | null;
   deadline: string | null;
   about?: string | null;
   preRequisite?: string | null;

@@ -9,10 +9,16 @@ type PersonalInfo = {
   phone?: string;
 };
 
+const inputClass =
+  "w-full min-w-0 rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-[#0F172A] outline-none transition placeholder:text-[#94A3B8] focus:border-[#007AFF] focus:ring-2 focus:ring-[#007AFF]/20 sm:text-sm";
+
 export default function PersonalInfoPage() {
   const [info, setInfo] = useState<PersonalInfo | null>(null);
+  const [accountEmail, setAccountEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const storedEmail =
@@ -25,6 +31,7 @@ export default function PersonalInfoPage() {
       return;
     }
 
+    setAccountEmail(storedEmail.trim().toLowerCase());
     const controller = new AbortController();
 
     (async () => {
@@ -40,9 +47,11 @@ export default function PersonalInfoPage() {
         const data = await res.json();
         if (data?.user) {
           const username = data.user.username ?? "";
+          const email = (data.user.email ?? storedEmail).trim().toLowerCase();
+          setAccountEmail(email);
           setInfo({
             username,
-            email: data.user.email ?? storedEmail,
+            email,
             phone: data.user.phone ?? "",
           });
           if (username) {
@@ -63,31 +72,73 @@ export default function PersonalInfoPage() {
   const handleSave = async () => {
     if (!info) return;
     setSaving(true);
+    setMessage(null);
+    setError(null);
+
     try {
-      const email = window.localStorage.getItem("tg_user_email");
-      if (!email) return;
+      const currentEmail =
+        accountEmail ||
+        window.localStorage.getItem("tg_user_email")?.trim().toLowerCase() ||
+        "";
+      if (!currentEmail) {
+        setError("Could not find your account email. Please sign in again.");
+        return;
+      }
+
+      const nextEmail = info.email.trim().toLowerCase();
+      if (!nextEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+        setError("Enter a valid email address.");
+        return;
+      }
 
       const res = await fetch("/api/user/update-info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
+          email: currentEmail,
+          newEmail: nextEmail,
           username: info.username,
           phone: info.phone,
         }),
       });
 
-      if (res.ok) {
-        window.localStorage.setItem("tg_user_name", info.username);
-        window.dispatchEvent(new Event("tg_user_name_updated"));
-        window.dispatchEvent(new Event("tg-profile-updated"));
-        alert("Profile updated successfully!");
-      } else {
-        alert("Failed to update profile");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "Failed to update profile",
+        );
       }
-    } catch (error) {
-      console.error(error);
-      alert("Error saving profile");
+
+      const savedEmail =
+        typeof data.email === "string"
+          ? data.email.trim().toLowerCase()
+          : nextEmail;
+
+      window.localStorage.setItem("tg_user_email", savedEmail);
+      window.localStorage.setItem("tg_user_name", info.username);
+      setAccountEmail(savedEmail);
+      setInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              email: savedEmail,
+            }
+          : prev,
+      );
+      window.dispatchEvent(new Event("tg_user_name_updated"));
+      window.dispatchEvent(new Event("tg-profile-updated"));
+      setMessage(
+        data.emailChanged
+          ? "Profile updated. Your email was changed successfully."
+          : "Profile updated successfully.",
+      );
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error ? err.message : "Error saving profile",
+      );
     } finally {
       setSaving(false);
     }
@@ -98,45 +149,57 @@ export default function PersonalInfoPage() {
   const phoneValue = loading ? "" : info?.phone ?? "";
 
   return (
-    <>
-      <div className="mb-8 flex items-center gap-6">
+    <div className="space-y-6 sm:space-y-8">
+      <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-5">
         {loading && !info?.username ? (
-          <div className="h-24 w-24 animate-pulse rounded-full bg-gray-200" />
+          <div className="h-16 w-16 shrink-0 animate-pulse rounded-full bg-gray-200 sm:h-24 sm:w-24" />
         ) : (
           <UserInitialsAvatar
             name={info?.username || info?.email}
             size="xl"
+            className="!h-16 !w-16 !text-xl sm:!h-24 sm:!w-24 sm:!text-2xl"
           />
         )}
-        <div>
+        <div className="min-w-0 flex-1">
           {loading && !info?.username ? (
             <div className="space-y-2">
-              <div className="h-8 w-48 animate-pulse rounded bg-gray-200" />
-              <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
+              <div className="h-7 w-40 max-w-full animate-pulse rounded bg-gray-200 sm:h-8 sm:w-48" />
+              <div className="h-4 w-48 max-w-full animate-pulse rounded bg-gray-200" />
             </div>
           ) : (
             <>
-              <h1 className="text-3xl font-semibold leading-tight">
+              <h1 className="truncate text-xl font-semibold leading-tight text-[#1E1E1E] sm:text-3xl">
                 {info?.username || "User"}
               </h1>
-              <p className="text-sm text-[#555555]">{info?.email}</p>
+              <p className="mt-1 break-all text-sm leading-snug text-[#555555] sm:break-words">
+                {info?.email}
+              </p>
             </>
           )}
         </div>
       </div>
 
       <div className="space-y-1">
-        <h2 className="text-xl font-semibold leading-tight">Profile</h2>
+        <h2 className="text-xl font-semibold leading-tight text-[#1E1E1E]">
+          Profile
+        </h2>
         <p className="text-sm text-[#555555]">
           Modify your username, phone number, and email
         </p>
       </div>
 
-      <div className="space-y-6 md:max-w-xl">
+      <div className="space-y-5 sm:max-w-xl sm:space-y-6">
         <div>
-          <label className="mb-1 block text-sm text-gray-600">Username</label>
+          <label
+            htmlFor="profile-username"
+            className="mb-1.5 block text-sm font-medium text-[#374151]"
+          >
+            Username
+          </label>
           <input
+            id="profile-username"
             type="text"
+            autoComplete="name"
             value={usernameValue}
             onChange={(event) =>
               setInfo((prev) => ({
@@ -145,19 +208,26 @@ export default function PersonalInfoPage() {
                 phone: prev?.phone ?? "",
               }))
             }
-            className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3
-                    focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 transition"
+            className={inputClass}
           />
-          <p className="mt-1.5 text-xs text-[#6B7280]">
+          <p className="mt-1.5 text-xs leading-relaxed text-[#6B7280]">
             Use your first and last name so your avatar shows the right
             initials, for example Felix Owusu becomes FO.
           </p>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm text-gray-600">Phone Number</label>
+          <label
+            htmlFor="profile-phone"
+            className="mb-1.5 block text-sm font-medium text-[#374151]"
+          >
+            Phone Number
+          </label>
           <input
-            type="text"
+            id="profile-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             value={phoneValue}
             onChange={(event) =>
               setInfo((prev) => ({
@@ -166,30 +236,65 @@ export default function PersonalInfoPage() {
                 phone: event.target.value,
               }))
             }
-            className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3
-                    focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 transition"
+            className={inputClass}
+            placeholder="Optional"
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm text-gray-600">Email</label>
+          <label
+            htmlFor="profile-email"
+            className="mb-1.5 block text-sm font-medium text-[#374151]"
+          >
+            Email
+          </label>
           <input
+            id="profile-email"
             type="email"
+            inputMode="email"
+            autoComplete="email"
             value={emailValue}
-            disabled
-            className="w-full cursor-not-allowed rounded-xl border border-gray-200 bg-gray-100 px-4 py-3 text-gray-500"
+            onChange={(event) =>
+              setInfo((prev) => ({
+                username: prev?.username ?? "",
+                email: event.target.value,
+                phone: prev?.phone ?? "",
+              }))
+            }
+            className={inputClass}
           />
+          <p className="mt-1.5 text-xs leading-relaxed text-[#6B7280]">
+            This email is used for sign-in and for your forms, vouchers, and
+            notifications.
+          </p>
         </div>
+
+        {error ? (
+          <div
+            className="rounded-2xl border border-red-100 bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]"
+            role="alert"
+          >
+            {error}
+          </div>
+        ) : null}
+        {message ? (
+          <div
+            className="rounded-2xl border border-green-100 bg-[#F0FDF4] px-4 py-3 text-sm text-[#166534]"
+            role="status"
+          >
+            {message}
+          </div>
+        ) : null}
 
         <button
           type="button"
           onClick={() => void handleSave()}
           disabled={loading || saving || !info}
-          className="rounded-full bg-[#007AFF] px-6 py-3 text-sm font-medium text-white shadow-sm hover:bg-[#0062CC] disabled:cursor-not-allowed disabled:bg-[#9EC8FF]"
+          className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#007AFF] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0062CC] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#9EC8FF] disabled:active:scale-100 sm:h-auto sm:w-auto sm:py-3"
         >
-          {saving ? "Saving..." : "Save changes"}
+          {saving ? "Saving…" : "Save changes"}
         </button>
       </div>
-    </>
+    </div>
   );
 }
