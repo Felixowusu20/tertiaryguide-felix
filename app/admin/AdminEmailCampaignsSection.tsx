@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Mail, History, Send, CheckCircle2, AlertCircle, Eye } from "lucide-react";
+import { Mail, History, Send, CheckCircle2, AlertCircle, Eye, Plus, Settings2 } from "lucide-react";
 
 import { BlogEditor } from "@/components/tiptap-templates/blog-editor";
 
@@ -24,11 +24,60 @@ export function AdminEmailCampaignsSection() {
   
   // New campaign state
   const [subject, setSubject] = useState("");
-  const [target, setTarget] = useState<"all" | "form-buyers" | "single">("single");
+  const [previewText, setPreviewText] = useState("");
+  const [template, setTemplate] = useState("announcement");
+  const [target, setTarget] = useState<"all" | "form-buyers" | "single" | "school" | "approaching-deadlines">("single");
+  const [schoolKey, setSchoolKey] = useState("");
+  const [deadlineDays, setDeadlineDays] = useState("30");
+  const [schools, setSchools] = useState<Array<{ name: string; slug?: string | null; alias?: string | null }>>([]);
   const [singleEmail, setSingleEmail] = useState("");
   const [htmlContent, setHtmlContent] = useState(`<h2>Hello from TertiaryGuide!</h2>
 <p>We are excited to share some updates with you.</p>
 <p>Best regards,<br/>The TertiaryGuide Team</p>`);
+  const [buttonLabel, setButtonLabel] = useState("Learn more");
+  const [buttonUrl, setButtonUrl] = useState("https://tertiaryguide.com");
+  const [buttonColor, setButtonColor] = useState("#374151");
+  const [footer, setFooter] = useState({
+    location: "Ho, Trafalgar, Ghana",
+    phone: "+233 59 511 0767",
+    phoneSecondary: "+233 24 896 7314",
+    email: "info@tertiaryguide.com",
+    instagram: "https://www.instagram.com/tertiaryguide1",
+    facebook: "https://www.facebook.com/share/1EAdiVWy5T/",
+    twitter: "https://x.com/TertiaryGuide1",
+    tiktok: "https://www.tiktok.com/@tertiaryguide",
+    youtube: "https://youtube.com/@tertiaryguide",
+  });
+
+  const adminHeaders = (): Record<string, string> => {
+    const username = typeof window !== "undefined" ? window.localStorage.getItem("tg_admin_username") : null;
+    return username ? { "x-admin-username": username } : {};
+  };
+
+  const applyTemplate = (value: string) => {
+    setTemplate(value);
+    const templates: Record<string, { subject: string; preview: string; html: string }> = {
+      announcement: { subject: "An update from TertiaryGuide", preview: "The latest news and updates from TertiaryGuide.", html: "<h2>What’s new at TertiaryGuide?</h2><p>We’re sharing a short update to help you plan your next step in tertiary education.</p><p>Visit TertiaryGuide to learn more.</p>" },
+      deadline: { subject: "Important admissions deadline", preview: "A reminder about an upcoming admissions deadline.", html: "<h2>Important admissions deadline</h2><p>Please take a moment to review the upcoming deadline and complete your application in good time.</p>" },
+      newsletter: { subject: "TertiaryGuide newsletter", preview: "News, opportunities, and practical guidance for applicants.", html: "<h2>Your TertiaryGuide update</h2><p>Here are the latest opportunities, guidance, and resources for your tertiary education journey.</p>" },
+      blank: { subject: "", preview: "", html: "<p>Write your message here.</p>" },
+    };
+    const next = templates[value] || templates.announcement;
+    setSubject(next.subject);
+    setPreviewText(next.preview);
+    setHtmlContent(next.html);
+  };
+
+  const insertButton = () => {
+    const label = buttonLabel.trim() || "Learn more";
+    const url = buttonUrl.trim();
+    if (!url || !/^https?:\/\//i.test(url)) {
+      alert("Use a complete button URL beginning with https://");
+      return;
+    }
+    const buttonHtml = `<p style="margin:24px 0;text-align:left;"><a href="${url.replace(/\"/g, "&quot;")}" style="display:inline-block;background:${buttonColor};color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:4px;font-weight:600;">${label.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</a></p>`;
+    setHtmlContent((current) => `${current}${buttonHtml}`);
+  };
   
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{
@@ -46,7 +95,7 @@ export function AdminEmailCampaignsSection() {
     try {
       setHistoryLoading(true);
       setHistoryError(null);
-      const res = await fetch("/api/admin/email-campaigns");
+      const res = await fetch("/api/admin/email-campaigns", { headers: adminHeaders() });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Failed to load campaign history");
@@ -65,6 +114,10 @@ export function AdminEmailCampaignsSection() {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    void fetch("/api/admin/schools", { headers: adminHeaders() }).then((res) => res.ok ? res.json() : null).then((data) => setSchools(data?.schools || [])).catch(() => undefined);
+  }, []);
+
   const handleSendCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subject.trim()) {
@@ -79,6 +132,10 @@ export function AdminEmailCampaignsSection() {
       alert("Please specify the recipient email address.");
       return;
     }
+    if (target === "school" && !schoolKey) {
+      alert("Please choose a school to feature.");
+      return;
+    }
 
     if (!confirm(`Are you sure you want to send this campaign to ${target === "single" ? singleEmail : target}?`)) {
       return;
@@ -90,11 +147,15 @@ export function AdminEmailCampaignsSection() {
 
       const res = await fetch("/api/admin/email-campaigns", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...adminHeaders() },
         body: JSON.stringify({
           subject,
+          previewText,
           htmlContent,
+          footer,
           target,
+          schoolKey: target === "school" ? schoolKey : undefined,
+          deadlineDays: target === "approaching-deadlines" ? Number(deadlineDays) : undefined,
           singleEmail: target === "single" ? singleEmail : undefined,
         }),
       });
@@ -130,6 +191,8 @@ export function AdminEmailCampaignsSection() {
   const getTargetBadgeLabel = (t: string, singleEmail?: string | null) => {
     if (t === "all") return "All Users";
     if (t === "form-buyers") return "Form Buyers";
+    if (t === "school") return "School Feature";
+    if (t === "approaching-deadlines") return "Approaching Deadlines";
     if (t === "single") return singleEmail ? `Single (${singleEmail})` : "Single Recipient";
     return t;
   };
@@ -207,6 +270,28 @@ export function AdminEmailCampaignsSection() {
             )}
 
             <div className="space-y-1.5">
+              <label htmlFor="campaign-template" className="text-xs font-semibold text-[#374151]">Template</label>
+              <select id="campaign-template" value={template} onChange={(e) => applyTemplate(e.target.value)} className="w-full rounded-lg border border-[#D1D5DB] px-3 py-2 text-sm text-[#111827] focus:border-[#374151] focus:outline-none focus:ring-1 focus:ring-[#374151]">
+                <option value="announcement">General announcement</option>
+                <option value="deadline">Admissions deadline</option>
+                <option value="newsletter">Newsletter</option>
+                <option value="blank">Blank email</option>
+              </select>
+            </div>
+
+            <details className="rounded-lg border border-[#E5E7EB] bg-[#FAFAFA]">
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-xs font-semibold text-[#374151]"><Settings2 className="h-4 w-4" /> Customize footer and contact details</summary>
+              <div className="grid gap-3 border-t border-[#E5E7EB] p-3 sm:grid-cols-2">
+                {(["location", "phone", "phoneSecondary", "email", "instagram", "facebook", "twitter", "tiktok", "youtube"] as const).map((key) => (
+                  <label key={key} className="space-y-1 text-[11px] font-medium text-[#4B5563]">
+                    <span>{key === "phoneSecondary" ? "Second phone" : key[0].toUpperCase() + key.slice(1)}</span>
+                    <input value={footer[key]} onChange={(e) => setFooter((current) => ({ ...current, [key]: e.target.value }))} className="w-full rounded-md border border-[#D1D5DB] bg-white px-2.5 py-2 text-xs text-[#111827] focus:border-[#374151] focus:outline-none" />
+                  </label>
+                ))}
+              </div>
+            </details>
+
+            <div className="space-y-1.5">
               <label htmlFor="campaign-subject" className="text-xs font-semibold text-[#374151]">
                 Subject Line
               </label>
@@ -222,18 +307,25 @@ export function AdminEmailCampaignsSection() {
             </div>
 
             <div className="space-y-1.5">
+              <label htmlFor="campaign-preview" className="text-xs font-semibold text-[#374151]">Preview text <span className="font-normal text-[#6B7280]">(optional)</span></label>
+              <input id="campaign-preview" type="text" value={previewText} onChange={(e) => setPreviewText(e.target.value)} placeholder="Short line shown beside the subject in an inbox" className="w-full rounded-lg border border-[#D1D5DB] px-3.5 py-2 text-sm text-[#111827] placeholder-gray-400 focus:border-[#374151] focus:outline-none focus:ring-1 focus:ring-[#374151]" />
+            </div>
+
+            <div className="space-y-1.5">
               <label htmlFor="campaign-target" className="text-xs font-semibold text-[#374151]">
                 Target Audience
               </label>
               <select
                 id="campaign-target"
                 value={target}
-                onChange={(e) => setTarget(e.target.value as any)}
+                onChange={(e) => { const next = e.target.value as typeof target; setTarget(next); if (next === "approaching-deadlines" && !htmlContent.includes("{approaching-deadlines}")) setHtmlContent((current) => `${current}\n{approaching-deadlines}`); }}
                 className="w-full rounded-xl border border-[#D1D5DB] px-3 py-2 text-sm text-[#111827] focus:border-[#2563EB] focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
               >
                 <option value="single">Single Test Email Recipient</option>
                 <option value="all">All Registered Users</option>
                 <option value="form-buyers">Form Voucher Buyers</option>
+                <option value="school">One school (all users)</option>
+                <option value="approaching-deadlines">Approaching deadlines (all users)</option>
               </select>
             </div>
 
@@ -252,6 +344,13 @@ export function AdminEmailCampaignsSection() {
                   required={target === "single"}
                 />
               </div>
+            )}
+
+            {target === "school" && (
+              <div className="space-y-1.5"><label htmlFor="campaign-school" className="text-xs font-semibold text-[#374151]">School to feature</label><select id="campaign-school" value={schoolKey} onChange={(e) => { setSchoolKey(e.target.value); setHtmlContent((current) => `${current}\n<p>{schoolKey ? "" : ""}</p>`.replace("<p></p>", `{school:${e.target.value}}`)); }} className="w-full rounded-lg border border-[#D1D5DB] px-3 py-2 text-sm"><option value="">Choose a school</option>{schools.map((school) => <option key={school.slug || school.name} value={school.slug || school.name}>{school.alias || school.name}</option>)}</select><p className="text-[11px] text-[#6B7280]">The selected school card includes its logo, deadline, and admissions link.</p></div>
+            )}
+            {target === "approaching-deadlines" && (
+              <div className="space-y-1.5"><label htmlFor="deadline-days" className="text-xs font-semibold text-[#374151]">Include deadlines within</label><select id="deadline-days" value={deadlineDays} onChange={(e) => setDeadlineDays(e.target.value)} className="w-full rounded-lg border border-[#D1D5DB] px-3 py-2 text-sm"><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option></select><p className="text-[11px] text-[#6B7280]">Use the token <code>{"{approaching-deadlines}"}</code> in the message where the school cards should appear.</p></div>
             )}
 
             <div className="space-y-1.5">
@@ -300,6 +399,15 @@ export function AdminEmailCampaignsSection() {
               )}
             </div>
 
+            <details className="rounded-lg border border-[#E5E7EB] bg-[#FAFAFA]">
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-xs font-semibold text-[#374151]"><Plus className="h-4 w-4" /> Add email button</summary>
+              <div className="grid gap-3 border-t border-[#E5E7EB] p-3 sm:grid-cols-[1fr_1.4fr_auto]">
+                <input value={buttonLabel} onChange={(e) => setButtonLabel(e.target.value)} placeholder="Button label" className="rounded-md border border-[#D1D5DB] px-2.5 py-2 text-xs" />
+                <input value={buttonUrl} onChange={(e) => setButtonUrl(e.target.value)} placeholder="https://example.com" className="rounded-md border border-[#D1D5DB] px-2.5 py-2 text-xs" />
+                <div className="flex items-center gap-2"><input type="color" value={buttonColor} onChange={(e) => setButtonColor(e.target.value)} className="h-9 w-10 cursor-pointer rounded border border-[#D1D5DB] bg-white p-1" /><button type="button" onClick={insertButton} className="inline-flex items-center gap-1.5 rounded-md bg-[#374151] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1F2937]"><Plus className="h-3.5 w-3.5" /> Insert</button></div>
+              </div>
+            </details>
+
             <button
               type="submit"
               disabled={sending}
@@ -329,7 +437,7 @@ export function AdminEmailCampaignsSection() {
               <h2 className="text-sm font-semibold">Live Email Preview</h2>
             </div>
             
-            <div className="mt-4 flex-1 rounded-xl border border-[#E5E7EB] bg-white overflow-hidden flex flex-col min-h-[350px]">
+            <div className="mt-4 flex-1 rounded-lg border border-[#E5E7EB] bg-[#F4F5F7] overflow-hidden flex flex-col min-h-[350px]">
               <div className="bg-[#F3F4F6] border-b border-[#E5E7EB] px-4 py-2 text-[11px] text-[#6B7280]">
                 <p><strong>From:</strong> TertiaryGuide &lt;no-reply@ventrapos.com&gt;</p>
                 <p className="truncate"><strong>Subject:</strong> {subject || "(No Subject Specified)"}</p>
@@ -337,7 +445,7 @@ export function AdminEmailCampaignsSection() {
               
               <iframe
                 title="Email Preview"
-                srcDoc={`<!DOCTYPE html><html><head><style>body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; margin: 0; color: #111827; line-height: 1.5; }</style></head><body>${htmlContent}</body></html>`}
+                srcDoc={`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2933}a{color:#374151}img{max-width:100%;height:auto}</style></head><body><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:20px 8px;background:#f4f5f7"><tr><td align="center"><table width="100%" style="max-width:620px;background:#fff;border:1px solid #e5e7eb" cellspacing="0" cellpadding="0"><tr><td style="padding:20px 24px;border-bottom:1px solid #e5e7eb"><img src="/hero/full-logo.png" width="205" style="display:block;width:205px;height:auto" alt="TertiaryGuide"></td></tr><tr><td style="padding:28px 24px;font-size:15px;line-height:1.6">${htmlContent}</td></tr><tr><td style="padding:20px 24px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px"><strong style="color:#374151">TertiaryGuide</strong><br>${footer.location}<br>${footer.phone} ${footer.phoneSecondary ? `| ${footer.phoneSecondary}` : ""}<br><a href="mailto:${footer.email}">${footer.email}</a><br><span>${footer.instagram ? "Instagram" : ""}${footer.facebook ? " | Facebook" : ""}${footer.twitter ? " | X" : ""}${footer.tiktok ? " | TikTok" : ""}${footer.youtube ? " | YouTube" : ""}</span><br><a href="/dashboard/notification">Manage email preferences</a></td></tr></table></td></tr></table></body></html>`}
                 className="w-full flex-1 border-0 bg-white"
               />
             </div>

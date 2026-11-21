@@ -99,7 +99,7 @@ export function CommentsSection({ postId }: CommentsSectionProps) {
 
             const data = await res.json();
             if (data.ok) {
-                await fetchComments(true); // Silent refetch
+                setComments(prev => prev.map(c => c._id === tempId ? data.comment : c));
             } else {
                 setComments(prev => prev.filter(c => c._id !== tempId));
                 alert("Failed to post comment.");
@@ -164,6 +164,7 @@ export function CommentsSection({ postId }: CommentsSectionProps) {
                         src={currentUserAvatar}
                         alt="You"
                         fill
+                        unoptimized
                         className="rounded-full border border-gray-100 object-cover"
                     />
                 </div>

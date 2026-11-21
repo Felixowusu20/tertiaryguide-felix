@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { UserInitialsAvatar } from "@/app/components/UserInitialsAvatar";
+import { UserAvatar } from "@/app/components/UserAvatar";
 
 type PersonalInfo = {
+  id: string;
   username: string;
   email: string;
   phone?: string;
+  profilePicture?: string | null;
+  avatarSeed?: string | null;
 };
 
 const inputClass =
@@ -17,8 +20,7 @@ export default function PersonalInfoPage() {
   const [accountEmail, setAccountEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
 
   useEffect(() => {
     const storedEmail =
@@ -50,9 +52,12 @@ export default function PersonalInfoPage() {
           const email = (data.user.email ?? storedEmail).trim().toLowerCase();
           setAccountEmail(email);
           setInfo({
+            id: data.user.id,
             username,
             email,
             phone: data.user.phone ?? "",
+            profilePicture: data.user.profilePicture ?? null,
+            avatarSeed: data.user.avatarSeed ?? null,
           });
           if (username) {
             window.localStorage.setItem("tg_user_name", username);
@@ -148,17 +153,44 @@ export default function PersonalInfoPage() {
   const emailValue = loading ? "" : info?.email ?? "";
   const phoneValue = loading ? "" : info?.phone ?? "";
 
+  const updateAvatar = async (payload: { image?: string; avatarSeed?: string }) => {
+    if (!info) return;
+    const email = window.localStorage.getItem("tg_user_email");
+    if (!email) return;
+    setAvatarSaving(true);
+    try {
+      const res = await fetch("/api/user/profile-picture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, ...payload }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not update profile photo");
+      const next = { ...info, profilePicture: data.profilePicture ?? null, avatarSeed: data.avatarSeed ?? null };
+      setInfo(next);
+      const avatarUrl = next.profilePicture || `https://api.navii.dev/avatar/${encodeURIComponent(next.avatarSeed || next.id)}?size=96&tileBg=auto`;
+      window.localStorage.setItem("tg_user_avatar", avatarUrl);
+      window.localStorage.setItem("tg_user_id", next.id);
+      window.localStorage.setItem("tg_user_avatar_seed", next.avatarSeed || "");
+      window.dispatchEvent(new Event("tg-profile-updated"));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not update profile photo");
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
+
+  const choosePhoto = (file?: File) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert("Please choose an image under 2MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => void updateAvatar({ image: String(reader.result || "") });
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="space-y-6 sm:space-y-8">
       <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-5">
         {loading && !info?.username ? (
           <div className="h-16 w-16 shrink-0 animate-pulse rounded-full bg-gray-200 sm:h-24 sm:w-24" />
         ) : (
-          <UserInitialsAvatar
-            name={info?.username || info?.email}
-            size="xl"
-            className="!h-16 !w-16 !text-xl sm:!h-24 sm:!w-24 sm:!text-2xl"
-          />
+          <div className="flex flex-col items-center gap-2"><UserAvatar userId={info?.id} avatarSeed={info?.avatarSeed} name={info?.username || info?.email} photoUrl={info?.profilePicture} size="xl" /><div className="flex gap-2"><label className="cursor-pointer rounded-full border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50">Upload<input type="file" accept="image/*" className="sr-only" disabled={avatarSaving} onChange={(event) => choosePhoto(event.target.files?.[0])} /></label><button type="button" disabled={avatarSaving || !info} onClick={() => void updateAvatar({ avatarSeed: crypto.randomUUID() })} className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">{avatarSaving ? "Updating..." : "New avatar"}</button></div></div>
         )}
         <div className="min-w-0 flex-1">
           {loading && !info?.username ? (
@@ -202,17 +234,12 @@ export default function PersonalInfoPage() {
             autoComplete="name"
             value={usernameValue}
             onChange={(event) =>
-              setInfo((prev) => ({
-                username: event.target.value,
-                email: prev?.email ?? "",
-                phone: prev?.phone ?? "",
-              }))
+              setInfo((prev) => prev ? { ...prev, username: event.target.value } : prev)
             }
             className={inputClass}
           />
-          <p className="mt-1.5 text-xs leading-relaxed text-[#6B7280]">
-            Use your first and last name so your avatar shows the right
-            initials, for example Felix Owusu becomes FO.
+          <p className="mt-1.5 text-xs text-[#6B7280]">
+            Use your first and last name so your profile is easy to recognize.
           </p>
         </div>
 
@@ -230,11 +257,7 @@ export default function PersonalInfoPage() {
             autoComplete="tel"
             value={phoneValue}
             onChange={(event) =>
-              setInfo((prev) => ({
-                username: prev?.username ?? "",
-                email: prev?.email ?? "",
-                phone: event.target.value,
-              }))
+              setInfo((prev) => prev ? { ...prev, phone: event.target.value } : prev)
             }
             className={inputClass}
             placeholder="Optional"
